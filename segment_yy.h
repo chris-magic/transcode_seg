@@ -26,6 +26,7 @@ typedef struct Segment_U{
 	int mode_type;						//YY_TRANSCODE ,YY_VOD ,YY_LIVE
 	char *storage_dir;					//directory storage the ts file and m3u8 file
 	//ts
+	char *ts_name ;						//ts name (rely on the mode_type )
 	double segment_duration;			//every segment duration
 	//m3u8
 	char *m3u8_name;							//m3u8 name
