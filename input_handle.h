@@ -40,6 +40,7 @@ typedef struct {
 int init_input(INPUT_CONTEXT *ptr_input_ctx, char* input_file);
 
 
+void malloc_input_memory(INPUT_CONTEXT *ptr_input_ctx);
 /*
  * function : init_input
  * @param:	ptr_input_ctx 	 	a structure contain the inputfile information

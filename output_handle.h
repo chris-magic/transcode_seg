@@ -3,6 +3,8 @@
 
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
+#include "libswresample/swresample.h"
+#include "libavutil/fifo.h"
 #include "input_handle.h"
 
 //output file information
@@ -10,7 +12,6 @@ typedef struct {
 	//output file
 	AVFormatContext *ptr_format_ctx;
 	AVOutputFormat *fmt;
-
 
 	/*	audio information */
 	AVStream *audio_stream;
@@ -21,12 +22,11 @@ typedef struct {
 	int audio_outbuf_size;
 	int16_t *samples;
 
-//	//audio sample number
-//	int audio_sample_num;
 
 	/*	video information */
 	AVStream *video_stream;
 	enum CodecID video_codec_id;
+	AVPacket pkt;					//video packet encode to output file
 
 	//video encoded buffer [out]
 	uint8_t *video_outbuf;
@@ -37,13 +37,34 @@ typedef struct {
 	AVFrame *encoded_yuv_pict;
 	uint8_t * pict_buf;
 
-
+	//audio resample
+	struct SwrContext *swr;
+	AVFifoBuffer *fifo;     /* for compression: one audio fifo per codec */
+	uint8_t *audio_buf;
+	unsigned int allocated_audio_buf_size;
+	int audio_resample;
 
 	//the input stream
 	double sync_ipts;
+	double base_ipts;
+
+	/*segment relative	*/
+	int mode_type;
+	//segment time measure
+	int start_time_mark ; //开始计时
+	double prev_segment_time ;
+	double curr_segment_time;
+
+	int dir_name_len;
+	char * ts_name ;						//ts name (rely on the mode_type )
+	double segment_duration;			//every segment duration
+	//m3u8
+	char *full_m3u8_name;							//m3u8 name
+	FILE *fp_m3u8;
+	char *ts_prfix_name;
+	unsigned int segment_no;
 
 }OUTPUT_CONTEXT;
-
 
 /*
  * function : init_input
@@ -51,7 +72,7 @@ typedef struct {
  * @param:	output_file			the output file name
  *
  * */
-int init_output(OUTPUT_CONTEXT *ptr_output_ctx, char* output_file ,INPUT_CONTEXT *ptr_input_ctx);
+int init_output(OUTPUT_CONTEXT *ptr_output_ctx, char* output_file );
 
 /*
  * function : open_stream_codec
@@ -66,7 +87,7 @@ void open_stream_codec(OUTPUT_CONTEXT *ptr_output_ctx);
  * @param:	pict				the input picture to encode
  *
  * */
-void encode_video_frame(OUTPUT_CONTEXT *ptr_output_ctx ,AVFrame *pict ,INPUT_CONTEXT *ptr_input_ctx);
+void encode_video_frame(OUTPUT_CONTEXT *ptr_output_ctx ,AVFrame *pict ,INPUT_CONTEXT *ptr_input_ctx );
 
 /*
  * function : encode_audio_frame
@@ -84,5 +105,11 @@ void encode_audio_frame(OUTPUT_CONTEXT *ptr_output_ctx , uint8_t *buf ,int buf_s
  *
  * */
 void encode_flush(OUTPUT_CONTEXT *ptr_output_ctx , int nb_ostreams);
+
+
+/*
+ * function : maybe resample the audio argument ,and then encode the audio data
+ * */
+void do_audio_out(OUTPUT_CONTEXT *ptr_output_ctx ,INPUT_CONTEXT *ptr_input_ctx ,AVFrame *decoded_frame);
 
 #endif

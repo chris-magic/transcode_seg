@@ -10,17 +10,23 @@
 #include <getopt.h>
 #include <dirent.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <string.h>
 
 
+#include "segment_utils.h"
+#include "input_handle.h"
+#include "output_handle.h"
 #include "chris_global.h"
 #include "chris_error.h"
 #include "segment_yy.h"
+
 
 void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 
 	/*parse options*/
 	int next_option;
-	static int version_num = 0;
 	//short char option
 	const char * const short_option = "vhi:m:d:t:p:n:";
 
@@ -127,3 +133,138 @@ void create_directory(char *storage_dir) {
 
 }
 
+void create_m3u8_name(Segment_U * seg_union ){
+	//add storage dir in the ts_name
+	if( seg_union->storage_dir[strlen(seg_union->storage_dir) -1 ] == '/'){ //storage end with '/'
+
+		sprintf(seg_union->full_m3u8_name ,"%s" ,seg_union->storage_dir);
+	}else{
+		sprintf(seg_union->full_m3u8_name ,"%s/" ,seg_union->storage_dir);
+	}
+
+	sprintf(&(seg_union->full_m3u8_name[strlen(seg_union->full_m3u8_name)]) ,"%s" ,seg_union->m3u8_name);
+
+}
+
+void create_first_ts_name(Segment_U * seg_union ,int mode_type){
+
+	//add storage dir in the ts_name
+	if( seg_union->storage_dir[strlen(seg_union->storage_dir) -1 ] == '/'){ //storage end with '/'
+
+		sprintf(seg_union->ts_name ,"%s" ,seg_union->storage_dir);
+	}else{
+		sprintf(seg_union->ts_name ,"%s/" ,seg_union->storage_dir);
+	}
+
+	seg_union->dir_name_len = strlen(seg_union->ts_name);
+	//structure  the first ts name
+	if(mode_type == YY_TRANSCODE){
+
+		sprintf(&(seg_union->ts_name[strlen(seg_union->ts_name)]) ,"%s.ts" ,seg_union->ts_prfix_name);
+	}else if(mode_type == YY_VOD){
+
+		sprintf(&(seg_union->ts_name[strlen(seg_union->ts_name)]) ,"%s-%d.ts" ,seg_union->ts_prfix_name ,++seg_union->segment_no);
+	}else if (mode_type == YY_LIVE){
+
+		sprintf(&(seg_union->ts_name[strlen(seg_union->ts_name)]) ,"%s-1.ts" ,seg_union->ts_prfix_name);
+	}
+
+}
+
+
+void record_segment_time(OUTPUT_CONTEXT *ptr_output_ctx){
+
+	if(ptr_output_ctx->start_time_mark == 0){
+		ptr_output_ctx->start_time_mark = 1;
+		printf("混蛋。。。、\n");
+		ptr_output_ctx->prev_segment_time = av_q2d(ptr_output_ctx->video_stream->time_base) *
+													(ptr_output_ctx->pkt.pts )
+													- (double)ptr_output_ctx->ptr_format_ctx->start_time / AV_TIME_BASE;
+
+		printf("ptr_output_ctx->prev_segment_time = %f \n" ,ptr_output_ctx->prev_segment_time);
+
+	}
+
+	ptr_output_ctx->curr_segment_time =
+						av_q2d(ptr_output_ctx->video_stream->time_base) *
+										(ptr_output_ctx->pkt.pts )
+										- (double)ptr_output_ctx->ptr_format_ctx->start_time / AV_TIME_BASE;
+	//printf("ptr_output_ctx->prev_segment_time = %f \n" ,ptr_output_ctx->curr_segment_time);
+
+//	//time meet
+	if(ptr_output_ctx->curr_segment_time - ptr_output_ctx->prev_segment_time >= ptr_output_ctx->segment_duration){
+		printf("...meet time ...\n" );
+		avio_flush(ptr_output_ctx->ptr_format_ctx->pb);
+		avio_close(ptr_output_ctx->ptr_format_ctx->pb);
+
+		printf("complete the %d.ts ,and write the m3u8 file..\n" ,ptr_output_ctx->segment_no);
+		write_m3u8_body( ptr_output_ctx ,ptr_output_ctx->curr_segment_time - ptr_output_ctx->prev_segment_time);
+		//concat ts file name
+		sprintf(&(ptr_output_ctx->ts_name[ptr_output_ctx->dir_name_len]) ,"%s-%d.ts" ,ptr_output_ctx->ts_prfix_name ,++ptr_output_ctx->segment_no);
+		if (avio_open(&(ptr_output_ctx->ptr_format_ctx->pb), ptr_output_ctx->ts_name, AVIO_FLAG_WRITE) < 0) {
+			fprintf(stderr, "Could not open '%s'\n", ptr_output_ctx->ts_name);
+			exit(OPEN_MUX_FILE_FAIL);
+		}
+
+		ptr_output_ctx->prev_segment_time = ptr_output_ctx->curr_segment_time;   //place here
+	}
+
+}
+
+
+void write_m3u8_header(OUTPUT_CONTEXT *ptr_output_ctx){
+	//vod
+	if(ptr_output_ctx->mode_type  == YY_VOD){
+		ptr_output_ctx->fp_m3u8 = fopen(ptr_output_ctx->full_m3u8_name, "wb+");
+
+		if(ptr_output_ctx->fp_m3u8 == NULL){
+			fprintf(stderr ,"Could not open m3u8 file %s...\n" ,ptr_output_ctx->full_m3u8_name);
+			exit(OPEN_M3U8_FAIL);
+		}
+
+		//write header
+		fprintf(ptr_output_ctx->fp_m3u8 ,"#EXTM3U\n#EXT-X-TARGETDURATION:%.02f\n#EXT-X-MEDIA-SEQUENCE:1\n" ,ptr_output_ctx->segment_duration);
+
+		fclose(ptr_output_ctx->fp_m3u8);
+	}
+}
+
+
+void write_m3u8_body(OUTPUT_CONTEXT *ptr_output_ctx ,double segment_duration){
+
+//	while(1);
+	//vod
+	if(ptr_output_ctx->mode_type  == YY_VOD){
+
+		ptr_output_ctx->fp_m3u8 = fopen(ptr_output_ctx->full_m3u8_name, "ab+");
+
+		if(ptr_output_ctx->fp_m3u8 == NULL){
+			fprintf(stderr ,"Could not open m3u8 file %s...\n" ,ptr_output_ctx->full_m3u8_name);
+			exit(OPEN_M3U8_FAIL);
+		}
+		fprintf(ptr_output_ctx->fp_m3u8 ,"#EXTINF:%.02f,\n%s-%u.ts\n" ,segment_duration ,ptr_output_ctx->ts_prfix_name ,
+									ptr_output_ctx->segment_no);
+
+		fclose(ptr_output_ctx->fp_m3u8);
+	}
+
+}
+
+void write_m3u8_tailer(OUTPUT_CONTEXT *ptr_output_ctx){
+
+	//vod
+	if(ptr_output_ctx->mode_type  == YY_VOD){
+
+		double tailer_duration = ptr_output_ctx->sync_ipts - ptr_output_ctx->prev_segment_time;
+		ptr_output_ctx->fp_m3u8 = fopen(ptr_output_ctx->full_m3u8_name, "ab+");
+
+		if(ptr_output_ctx->fp_m3u8 == NULL){
+			fprintf(stderr ,"Could not open m3u8 file %s...\n" ,ptr_output_ctx->full_m3u8_name);
+			exit(OPEN_M3U8_FAIL);
+		}
+		fprintf(ptr_output_ctx->fp_m3u8 ,"#EXTINF:%.02f,\n%s-%u.ts\n#EXT-X-ENDLIST\n" ,tailer_duration ,ptr_output_ctx->ts_prfix_name ,
+									ptr_output_ctx->segment_no);
+
+		fclose(ptr_output_ctx->fp_m3u8);
+	}
+}

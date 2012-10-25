@@ -25,9 +25,12 @@ int main(int argc ,char * argv[]){
 	printf("input ->segment_duration %f \n" ,seg_union->segment_duration);
 
 
-	/*	init input decoder and encoder*/
+	/*	segmentation medium	*/
+	//main function
+	seg_transcode_main(seg_union);
 
 
+	return 0;
 }
 
 

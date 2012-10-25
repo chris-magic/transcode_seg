@@ -41,6 +41,8 @@
 
 #define 	CREAT_DIR_FAIL					0x42
 #define		CREAT_M3U8_DIR_FAIL				0x43
+#define		OPEN_M3U8_FAIL					0x44
+
 
 
 
