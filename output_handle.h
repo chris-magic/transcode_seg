@@ -64,7 +64,7 @@ typedef struct {
 	char *ts_prfix_name;
 	unsigned int segment_no;
 
-}OUTPUT_CONTEXT;
+}Output_Context;
 
 /*
  * function : init_input
@@ -72,14 +72,14 @@ typedef struct {
  * @param:	output_file			the output file name
  *
  * */
-int init_output(OUTPUT_CONTEXT *ptr_output_ctx, char* output_file );
+int init_output(Output_Context *ptr_output_ctx, char* output_file );
 
 /*
  * function : open_stream_codec
  * @param:	ptr_output_ctx 	 	a structure contain the output file information
  *
  * */
-void open_stream_codec(OUTPUT_CONTEXT *ptr_output_ctx);
+void open_stream_codec(Output_Context *ptr_output_ctx);
 
 /*
  * function : encode_video_frame
@@ -87,7 +87,7 @@ void open_stream_codec(OUTPUT_CONTEXT *ptr_output_ctx);
  * @param:	pict				the input picture to encode
  *
  * */
-void encode_video_frame(OUTPUT_CONTEXT *ptr_output_ctx ,AVFrame *pict ,INPUT_CONTEXT *ptr_input_ctx );
+void encode_video_frame(Output_Context *ptr_output_ctx ,AVFrame *pict ,Input_Context *ptr_input_ctx );
 
 /*
  * function : encode_audio_frame
@@ -95,7 +95,7 @@ void encode_video_frame(OUTPUT_CONTEXT *ptr_output_ctx ,AVFrame *pict ,INPUT_CON
  * @param:	buf					buf contain the decode audio data ,and then put into audio encoder
  *
  * */
-void encode_audio_frame(OUTPUT_CONTEXT *ptr_output_ctx , uint8_t *buf ,int buf_size);
+void encode_audio_frame(Output_Context *ptr_output_ctx , uint8_t *buf ,int buf_size);
 
 
 /*
@@ -104,12 +104,18 @@ void encode_audio_frame(OUTPUT_CONTEXT *ptr_output_ctx , uint8_t *buf ,int buf_s
  * @param:  nb_ostreams			the number in the output file
  *
  * */
-void encode_flush(OUTPUT_CONTEXT *ptr_output_ctx , int nb_ostreams);
+void encode_flush(Output_Context *ptr_output_ctx , int nb_ostreams);
 
 
 /*
  * function : maybe resample the audio argument ,and then encode the audio data
  * */
-void do_audio_out(OUTPUT_CONTEXT *ptr_output_ctx ,INPUT_CONTEXT *ptr_input_ctx ,AVFrame *decoded_frame);
+void do_audio_out(Output_Context *ptr_output_ctx ,Input_Context *ptr_input_ctx ,AVFrame *decoded_frame);
+
+
+/*
+ * function :free the output memory
+ * */
+void free_output_memory(Output_Context *ptr_output_ctx);
 
 #endif

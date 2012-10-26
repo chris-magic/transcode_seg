@@ -12,7 +12,7 @@
 //ffmpeg header
 #include <libavutil/avutil.h>
 
-int init_input(INPUT_CONTEXT *ptr_input_ctx, char* input_file) {
+int init_input(Input_Context *ptr_input_ctx, char* input_file) {
 
 	//open input file
 	ptr_input_ctx->ptr_format_ctx = NULL;
@@ -102,8 +102,18 @@ int init_input(INPUT_CONTEXT *ptr_input_ctx, char* input_file) {
 
 }
 
+void free_input(Input_Context *ptr_input_ctx){
 
-void malloc_input_memory(INPUT_CONTEXT *ptr_input_ctx){
+	avformat_close_input(&ptr_input_ctx->ptr_format_ctx);
+
+	avcodec_close(ptr_input_ctx->video_codec_ctx);
+
+	avcodec_close(ptr_input_ctx->audio_codec_ctx);
+
+}
+
+
+void malloc_input_memory(Input_Context *ptr_input_ctx){
 	/*	malloc memory 	*/
 	ptr_input_ctx->yuv_frame = avcodec_alloc_frame();
 	if(ptr_input_ctx->yuv_frame == NULL){
@@ -118,3 +128,14 @@ void malloc_input_memory(INPUT_CONTEXT *ptr_input_ctx){
 		exit(MEMORY_MALLOC_FAIL);
 	}
 }
+
+void free_input_memory(Input_Context *ptr_input_ctx){
+
+	if(ptr_input_ctx->yuv_frame)
+		av_free(ptr_input_ctx->yuv_frame);
+
+	if(ptr_input_ctx->audio_decode_frame)
+		av_free(ptr_input_ctx->audio_decode_frame);
+}
+
+

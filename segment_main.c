@@ -13,23 +13,18 @@
 
 int main(int argc ,char * argv[]){
 
-	/*Segment union */
+	//define a struct point variable
 	Segment_U * seg_union = NULL;
+
+	/*Segment union */
 	init_seg_union(&seg_union ,argc ,argv);
 
-	printf("input mod %d \n" ,seg_union->mode_type);
-	printf("input dir %s \n" ,seg_union->storage_dir);
-	printf("input seg_union->ts_prfix_name %s \n" ,seg_union->ts_prfix_name);
-	printf("input ts_prfix_name %s \n" ,seg_union->ts_prfix_name);
-	printf("input ->m3u8_name %s \n" ,seg_union->m3u8_name);
-	printf("input ->segment_duration %f \n" ,seg_union->segment_duration);
-
-
-	/*	segmentation medium	*/
-	//main function
+	/*segmentation medium	*/
 	seg_transcode_main(seg_union);
 
 
+	/*free memory*/
+	free_seg_union(seg_union);
 	return 0;
 }
 

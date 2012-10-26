@@ -172,7 +172,7 @@ void create_first_ts_name(Segment_U * seg_union ,int mode_type){
 }
 
 
-void record_segment_time(OUTPUT_CONTEXT *ptr_output_ctx){
+void record_segment_time(Output_Context *ptr_output_ctx){
 
 	if(ptr_output_ctx->start_time_mark == 0){
 		ptr_output_ctx->start_time_mark = 1;
@@ -212,7 +212,7 @@ void record_segment_time(OUTPUT_CONTEXT *ptr_output_ctx){
 }
 
 
-void write_m3u8_header(OUTPUT_CONTEXT *ptr_output_ctx){
+void write_m3u8_header(Output_Context *ptr_output_ctx){
 	//vod
 	if(ptr_output_ctx->mode_type  == YY_VOD){
 		ptr_output_ctx->fp_m3u8 = fopen(ptr_output_ctx->full_m3u8_name, "wb+");
@@ -230,7 +230,7 @@ void write_m3u8_header(OUTPUT_CONTEXT *ptr_output_ctx){
 }
 
 
-void write_m3u8_body(OUTPUT_CONTEXT *ptr_output_ctx ,double segment_duration){
+void write_m3u8_body(Output_Context *ptr_output_ctx ,double segment_duration){
 
 //	while(1);
 	//vod
@@ -250,7 +250,7 @@ void write_m3u8_body(OUTPUT_CONTEXT *ptr_output_ctx ,double segment_duration){
 
 }
 
-void write_m3u8_tailer(OUTPUT_CONTEXT *ptr_output_ctx){
+void write_m3u8_tailer(Output_Context *ptr_output_ctx){
 
 	//vod
 	if(ptr_output_ctx->mode_type  == YY_VOD){

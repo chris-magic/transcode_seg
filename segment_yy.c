@@ -6,6 +6,7 @@
  */
 #include <stdio.h>
 
+#include "libswscale/swscale.h"
 #include "segment_yy.h"
 #include "segment_utils.h"
 #include "chris_error.h"
@@ -45,13 +46,14 @@ int init_seg_union(Segment_U ** segment_union ,int argc ,char * argv[]) {   //ä¼
 	av_register_all();
 	avformat_network_init();
 	//malloc memory
-	if( (seg_union->input_ctx = malloc (sizeof(INPUT_CONTEXT))) == NULL){
+	if( (seg_union->input_ctx = malloc (sizeof(Input_Context))) == NULL){
 
 		printf("ptr_input_ctx malloc failed .\n");
 		exit(MEMORY_MALLOC_FAIL);
 	}
 	malloc_input_memory(seg_union->input_ctx);
-	if( (seg_union->output_ctx = malloc (sizeof(OUTPUT_CONTEXT))) == NULL){
+
+	if( (seg_union->output_ctx = malloc (sizeof(Output_Context))) == NULL){
 
 		printf("ptr_output_ctx malloc failed .\n");
 		exit(MEMORY_MALLOC_FAIL);
@@ -74,10 +76,10 @@ int init_seg_union(Segment_U ** segment_union ,int argc ,char * argv[]) {   //ä¼
 	return 0;
 }
 
-#include "libswscale/swscale.h"
+
 int seg_transcode_main(Segment_U * seg_union){
 
-	OUTPUT_CONTEXT *ptr_output_ctx = seg_union->output_ctx;
+	Output_Context *ptr_output_ctx = seg_union->output_ctx;
 
     if (!(ptr_output_ctx->fmt->flags & AVFMT_NOFILE)) {		//for mp4 or mpegts ,this must be performed
         if (avio_open(&(ptr_output_ctx->ptr_format_ctx->pb), seg_union->ts_name, AVIO_FLAG_WRITE) < 0) {
@@ -93,7 +95,7 @@ int seg_transcode_main(Segment_U * seg_union){
 
     	/*initialize input file information*/
     	init_input( seg_union->input_ctx ,seg_union->input_file[i]);
-    	INPUT_CONTEXT *ptr_input_ctx = seg_union->input_ctx;
+    	Input_Context *ptr_input_ctx = seg_union->input_ctx;
 
 		ptr_output_ctx->img_convert_ctx = sws_getContext(
 				ptr_input_ctx->video_codec_ctx->width ,ptr_input_ctx->video_codec_ctx->height ,PIX_FMT_YUV420P,
@@ -189,10 +191,7 @@ int seg_transcode_main(Segment_U * seg_union){
 		printf("end while ......,time_base = %f .............> \n" ,ptr_output_ctx->base_ipts  );
 		ptr_output_ctx->audio_resample = 0;
 		sws_freeContext(ptr_output_ctx->img_convert_ctx);
-		avformat_close_input(&ptr_input_ctx->ptr_format_ctx);
-		avcodec_close(ptr_input_ctx->video_codec_ctx);
-		avcodec_close(ptr_input_ctx->audio_codec_ctx);
-
+		free_input(ptr_input_ctx);
     } //end for
 
 	printf("before flush ,ptr_output_ctx->ptr_format_ctx->nb_streams = %d \n\n" ,ptr_output_ctx->ptr_format_ctx->nb_streams);
@@ -205,3 +204,22 @@ int seg_transcode_main(Segment_U * seg_union){
 	return 0;
 }
 
+
+int free_seg_union(Segment_U * seg_union){
+	printf("start free segment union ...\n");
+
+	//free input context relevance
+	free_input_memory(seg_union->input_ctx);
+
+	if(seg_union->input_ctx)
+		free(seg_union->input_ctx);
+
+	//free output context relevance
+	free_output_memory(seg_union->output_ctx);
+	if(seg_union->output_ctx)
+		free(seg_union->output_ctx);
+	//at last
+	if(seg_union)
+		free(seg_union);
+	return 0;
+}

@@ -36,15 +36,15 @@ void create_first_ts_name(Segment_U * segment_union ,int mode_type);
 void create_m3u8_name(Segment_U * seg_union );
 
 
-void record_segment_time(OUTPUT_CONTEXT *ptr_output_ctx);
+void record_segment_time(Output_Context *ptr_output_ctx);
 
 /*
  * write m3u8 file functions
  * */
-void write_m3u8_header(OUTPUT_CONTEXT *ptr_output_ctx);
+void write_m3u8_header(Output_Context *ptr_output_ctx);
 
-void write_m3u8_body(OUTPUT_CONTEXT *ptr_output_ctx ,double segment_duration);
+void write_m3u8_body(Output_Context *ptr_output_ctx ,double segment_duration);
 
-void write_m3u8_tailer(OUTPUT_CONTEXT *ptr_output_ctx);
+void write_m3u8_tailer(Output_Context *ptr_output_ctx);
 
 #endif /* SEGMENT_UTILS_H_ */

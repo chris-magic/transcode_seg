@@ -114,7 +114,7 @@ static AVStream * add_audio_stream (AVFormatContext *fmt_ctx ,enum CodecID codec
 	return st;
 }
 
-int init_output(OUTPUT_CONTEXT *ptr_output_ctx, char* output_file ){
+int init_output(Output_Context *ptr_output_ctx, char* output_file ){
 
 	//set AVOutputFormat
     /* allocate the output media context */
@@ -206,7 +206,7 @@ int init_output(OUTPUT_CONTEXT *ptr_output_ctx, char* output_file ){
 
 
 //===========================================================
-static void open_video (OUTPUT_CONTEXT *ptr_output_ctx ,AVStream * st){
+static void open_video (Output_Context *ptr_output_ctx ,AVStream * st){
 
 	AVCodec *video_encode;
 	AVCodecContext *video_codec_ctx;
@@ -243,7 +243,7 @@ static void open_video (OUTPUT_CONTEXT *ptr_output_ctx ,AVStream * st){
 
 }
 
-static void open_audio (OUTPUT_CONTEXT *ptr_output_ctx ,AVStream * st){
+static void open_audio (Output_Context *ptr_output_ctx ,AVStream * st){
 
 	AVCodec *audio_encode;
 	AVCodecContext *audio_codec_ctx;
@@ -294,12 +294,12 @@ static void open_audio (OUTPUT_CONTEXT *ptr_output_ctx ,AVStream * st){
     } else {
         audio_input_frame_size = audio_codec_ctx->frame_size;
     }
-    ptr_output_ctx->samples = av_malloc(audio_input_frame_size * 2 * audio_codec_ctx->channels);
+    //ptr_output_ctx->samples = av_malloc(audio_input_frame_size * 2 * audio_codec_ctx->channels);
 
 }
 
 
-void open_stream_codec(OUTPUT_CONTEXT *ptr_output_ctx){
+void open_stream_codec(Output_Context *ptr_output_ctx){
 
 	open_video (ptr_output_ctx ,ptr_output_ctx->video_stream);
 
@@ -307,8 +307,8 @@ void open_stream_codec(OUTPUT_CONTEXT *ptr_output_ctx){
 
 }
 
-void encode_video_frame(OUTPUT_CONTEXT *ptr_output_ctx, AVFrame *pict,
-		INPUT_CONTEXT *ptr_input_ctx ) {
+void encode_video_frame(Output_Context *ptr_output_ctx, AVFrame *pict,
+		Input_Context *ptr_input_ctx ) {
 
 	static int frame_count = 0;
 	int nb_frames;
@@ -397,7 +397,7 @@ void encode_video_frame(OUTPUT_CONTEXT *ptr_output_ctx, AVFrame *pict,
 }
 
 
-void encode_audio_frame(OUTPUT_CONTEXT *ptr_output_ctx , uint8_t *buf ,int buf_size){
+void encode_audio_frame(Output_Context *ptr_output_ctx , uint8_t *buf ,int buf_size){
 
 	int ret;
 	AVCodecContext *c = ptr_output_ctx->audio_stream->codec;
@@ -449,7 +449,7 @@ static void generate_silence(uint8_t* buf, enum AVSampleFormat sample_fmt, size_
     memset(buf, fill_char, size);
 }
 
-void encode_flush(OUTPUT_CONTEXT *ptr_output_ctx , int nb_ostreams){
+void encode_flush(Output_Context *ptr_output_ctx , int nb_ostreams){
 
 	int i ;
 
@@ -508,6 +508,8 @@ void encode_flush(OUTPUT_CONTEXT *ptr_output_ctx , int nb_ostreams){
 					pkt.stream_index = ptr_output_ctx->audio_stream->index;
 
 					av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt);
+
+					av_free(&pkt);
 				}
 
 				break;
@@ -575,7 +577,7 @@ void encode_flush(OUTPUT_CONTEXT *ptr_output_ctx , int nb_ostreams){
 }
 
 
-void do_audio_out(OUTPUT_CONTEXT *ptr_output_ctx ,INPUT_CONTEXT *ptr_input_ctx ,AVFrame *decoded_frame){
+void do_audio_out(Output_Context *ptr_output_ctx ,Input_Context *ptr_input_ctx ,AVFrame *decoded_frame){
 
 	uint8_t *buftmp;
 	int64_t audio_buf_size, size_out;
@@ -666,7 +668,6 @@ void do_audio_out(OUTPUT_CONTEXT *ptr_output_ctx ,INPUT_CONTEXT *ptr_input_ctx ,
 
 
 	//write data
-//	if (1) {
 
 //		printf("av_fifo_size(ptr_output_ctx->fifo) = %d \n" ,av_fifo_size(ptr_output_ctx->fifo));
 		if (av_fifo_realloc2(ptr_output_ctx->fifo,
@@ -684,6 +685,36 @@ void do_audio_out(OUTPUT_CONTEXT *ptr_output_ctx ,INPUT_CONTEXT *ptr_input_ctx ,
 			av_fifo_generic_read(ptr_output_ctx->fifo, ptr_output_ctx->audio_buf, frame_bytes, NULL);
 			encode_audio_frame(ptr_output_ctx, ptr_output_ctx->audio_buf, frame_bytes);
 		}
-//	}
+
+}
+
+
+void free_output_memory(Output_Context *ptr_output_ctx){
+
+
+	//malloc in open_video
+	av_free(ptr_output_ctx->video_outbuf);
+
+	//malloc in open_audio
+	av_free(ptr_output_ctx->audio_outbuf);
+
+	//audio buffer
+	av_fifo_free(ptr_output_ctx->fifo);
+
+	av_free(ptr_output_ctx->pict_buf);
+
+	av_free(ptr_output_ctx->encoded_yuv_pict);
+
+	//close codecs
+	avcodec_close(ptr_output_ctx->video_stream->codec);
+	avcodec_close(ptr_output_ctx->audio_stream->codec);
+
+
+
+
+	//free
+	avformat_free_context(ptr_output_ctx->ptr_format_ctx);
+
+
 
 }

@@ -38,10 +38,10 @@ typedef struct Segment_U{
 	char *ts_prfix_name;				//the prefix of the ts in the m3u8 file，if just transcode ,this is the ts file prefix
 
 	/*	input file decode	*/
-	INPUT_CONTEXT *input_ctx;
+	Input_Context *input_ctx;
 
 	/*	output file encode	*/
-	OUTPUT_CONTEXT *output_ctx;
+	Output_Context *output_ctx;
 
 	/*	VOD	*/
 	unsigned int segment_no;

@@ -27,7 +27,7 @@ typedef struct {
 
 	/*	decode mark	*/
 	int 		mark_have_frame;
-}INPUT_CONTEXT;
+}Input_Context;
 
 
 
@@ -37,17 +37,32 @@ typedef struct {
  * @param:	input_file			the input file name
  *
  * */
-int init_input(INPUT_CONTEXT *ptr_input_ctx, char* input_file);
+int init_input(Input_Context *ptr_input_ctx, char* input_file);
+
+/*
+ * function : free input ,in order to close codecs and input streams
+ * @param:	ptr_input_ctx 	 	a structure contain the inputfile information
+ *
+ * */
+void free_input(Input_Context *ptr_input_ctx);
 
 
-void malloc_input_memory(INPUT_CONTEXT *ptr_input_ctx);
+/*
+ * function : manual malloc some memory
+ * @param:	ptr_input_ctx 	 	a structure contain the inputfile information
+ *
+ * */
+void malloc_input_memory(Input_Context *ptr_input_ctx);
+
+
+void free_input_memory(Input_Context *ptr_input_ctx);
 /*
  * function : init_input
  * @param:	ptr_input_ctx 	 	a structure contain the inputfile information
  * @param:	pkt					the packet read from the AVFormatContext
  *
  * */
-void decode_frame(INPUT_CONTEXT *ptr_input_ctx ,AVPacket *pkt);
+void decode_frame(Input_Context *ptr_input_ctx ,AVPacket *pkt);
 
 
 #endif
