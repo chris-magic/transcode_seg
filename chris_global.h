@@ -16,10 +16,10 @@
 
 #define 		VIDEO_FRAME_RATE				25
 
-#define 		VIDEO_WIDTH						640
-#define 		VIDEO_HEIGHT					360
+#define 		VIDEO_WIDTH						1280
+#define 		VIDEO_HEIGHT					720
 
-#define 		VIDEO_BIT_RATE					600*1000
+#define 		VIDEO_BIT_RATE					3000*1000
 
 #define 		ID_VIDEO_STREAM					0
 
@@ -31,7 +31,7 @@
 #define 		AUDIO_CODEC_ID					CODEC_ID_AAC
 #define 		AUDIO_OUT_BUF_SIZE				10000
 
-#define 		AUDIO_BIT_RATE					64000
+#define 		AUDIO_BIT_RATE					128*1000
 #define			AUDIO_SAMPLE_RATE				44100
 #define			AUDIO_CHANNAL					2
 

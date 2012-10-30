@@ -41,12 +41,24 @@ AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id){
 	avctx->codec_id = codec_id;
 	avctx->codec_type = AVMEDIA_TYPE_VIDEO;
 
-	avctx->bit_rate = VIDEO_BIT_RATE;
+	//resolution
 	avctx->width = VIDEO_WIDTH;
 	avctx->height = VIDEO_HEIGHT;
 
+	//set bit rate
+	avctx->bit_rate = VIDEO_BIT_RATE;
+	avctx->rc_max_rate = VIDEO_BIT_RATE;
+	avctx->rc_min_rate = VIDEO_BIT_RATE;
+	avctx->bit_rate_tolerance = VIDEO_BIT_RATE;
+	avctx->rc_buffer_size = VIDEO_BIT_RATE;
+	avctx->rc_initial_buffer_occupancy = avctx->rc_buffer_size * 3 / 4;
+	avctx->rc_buffer_aggressivity = (float)1.0;
+	avctx->rc_initial_cplx = 0.5;
+
+
+
 	avctx->pix_fmt = PIX_FMT_YUV420P;
-	avctx->me_range = 16;
+	avctx->me_range = 24;
 	avctx->qcompress = 0.6;
 	avctx->qmin = 10;
 	avctx->qmax = 51;
@@ -60,19 +72,46 @@ AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id){
 	avctx->time_base.num = 1;
 
 	//key frame
-	avctx->keyint_min = 25;
+	avctx->keyint_min = VIDEO_FRAME_RATE;
 	avctx->scenechange_threshold = 0;
 	avctx->gop_size = VIDEO_FRAME_RATE;
 
-//	avctx->me_cmp = 2;
-//	avctx->me_sub_cmp = 2;
-//	    avctx->mb_decision = 2;
+	//other
+	avctx->global_quality = 6;
 
-//
-//	avctx->max_b_frames = 20;
-//	avctx->keyint_min = 2;
+	avctx->thread_count = 1;
+//	avctx->cqp = 26;
+	avctx->refs = 3;
+	avctx->trellis = 2;
 
-	avctx->profile = FF_PROFILE_H264_MAIN;
+	avctx->me_method = 8;
+	avctx->me_range = 16;
+	avctx->me_subpel_quality = 7;
+	avctx->qmin = 10;
+	avctx->qmax = 51;
+	avctx->rc_initial_buffer_occupancy = 0.9;
+	avctx->i_quant_factor = 1.0/1.40f;  //
+	avctx->b_quant_factor = 1.30f;	//值越大 B frame 劣化越严重
+	avctx->chromaoffset = 0;
+	avctx->max_qdiff = 4;
+	avctx->qcompress = 0.6f;		//affect mbtree
+	avctx->qblur = 0.5f;
+	avctx->noise_reduction = 0;
+	avctx->scenechange_threshold = 40;
+
+	avctx->flags2 = CODEC_FLAG2_MIXED_REFS;
+	avctx->flags2 |= CODEC_FLAG2_8X8DCT;
+	avctx->flags |= CODEC_FLAG_LOOP_FILTER;
+	avctx->me_cmp = FF_CMP_CHROMA;
+	avctx->flags2 |= CODEC_FLAG2_AUD;
+	avctx->flags2 |= CODEC_FLAG2_FASTPSKIP;
+	avctx->flags2 |= CODEC_FLAG2_BPYRAMID;   //allow B-frames to be used as references
+	avctx->flags2 |= CODEC_FLAG_NORMALIZE_AQP;
+	avctx->flags2 |= CODEC_FLAG2_WPRED;
+	avctx->flags2 |= CODEC_FLAG2_MBTREE;  //宏块层次Use macroblock tree ratecontrol
+
+	avctx->level = 21;
+	avctx->profile = FF_PROFILE_H264_MAIN;   // do not effective
 	// some formats want stream headers to be separate(for example ,asfenc.c ,but not mpegts)
 	if (fmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
 		avctx->flags |= CODEC_FLAG_GLOBAL_HEADER;
