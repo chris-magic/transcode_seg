@@ -260,8 +260,12 @@ static void open_video (Output_Context *ptr_output_ctx ,AVStream * st){
 		exit(NO_FIND_VIDEO_ENCODE);
 	}
 
+	AVDictionary *opts = NULL;
+
+//	av_dict_set(&opts, "profile", "baseline", 0);
+	av_dict_set(&opts, "profile", "high", 0);
 	//open video encode
-	if(avcodec_open2(video_codec_ctx ,video_encode ,NULL) < 0){
+	if(avcodec_open2(video_codec_ctx ,video_encode ,&opts/*NULL*/) < 0){
 
 		printf("in open_video function ,can not open video encode.\n");
 		exit(OPEN_VIDEO_ENCODE_FAIL);
