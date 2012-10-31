@@ -46,9 +46,18 @@ typedef struct Segment_U{
 	/*	VOD	*/
 	unsigned int segment_no;
 
+
+	//user can control input
+	int frame_rate;						 //frame rate
+	int width;							//video width
+	int height;							//video height
+	int video_rate;						//video bitrate
+	int audio_rate;						//audio bitrate
+	int sample;							//audio sample
+	int channel;						//audio channels
+
+
 }Segment_U;
-
-
 /*
  * function	: init the argument of the struct Segment_U
  *

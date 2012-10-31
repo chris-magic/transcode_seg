@@ -20,7 +20,7 @@
 
 #include "segment_utils.h"
 //参考了output-example.c
-AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id){
+AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id ,Output_Context *ptr_output_ctx){
 
 	AVCodecContext *avctx;
 	AVStream *st;
@@ -42,15 +42,15 @@ AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id){
 	avctx->codec_type = AVMEDIA_TYPE_VIDEO;
 
 	//resolution
-	avctx->width = VIDEO_WIDTH;
-	avctx->height = VIDEO_HEIGHT;
+	avctx->width = ptr_output_ctx->width;//VIDEO_WIDTH;
+	avctx->height = ptr_output_ctx->height;//VIDEO_HEIGHT;
 
 	//set bit rate
-	avctx->bit_rate = VIDEO_BIT_RATE;
-	avctx->rc_max_rate = VIDEO_BIT_RATE;
-	avctx->rc_min_rate = VIDEO_BIT_RATE;
-	avctx->bit_rate_tolerance = VIDEO_BIT_RATE;
-	avctx->rc_buffer_size = VIDEO_BIT_RATE;
+	avctx->bit_rate = ptr_output_ctx->video_rate;//VIDEO_BIT_RATE;
+	avctx->rc_max_rate = ptr_output_ctx->video_rate;//VIDEO_BIT_RATE;
+	avctx->rc_min_rate = ptr_output_ctx->video_rate;//VIDEO_BIT_RATE;
+	avctx->bit_rate_tolerance = ptr_output_ctx->video_rate;//VIDEO_BIT_RATE;
+	avctx->rc_buffer_size = ptr_output_ctx->video_rate;//VIDEO_BIT_RATE;
 	avctx->rc_initial_buffer_occupancy = avctx->rc_buffer_size * 3 / 4;
 	avctx->rc_buffer_aggressivity = (float)1.0;
 	avctx->rc_initial_cplx = 0.5;
@@ -68,13 +68,13 @@ AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id){
 	avctx->rc_lookahead = 60;
 
 
-	avctx->time_base.den = VIDEO_FRAME_RATE;
+	avctx->time_base.den = ptr_output_ctx->frame_rate;//VIDEO_FRAME_RATE;
 	avctx->time_base.num = 1;
 
 	//key frame
-	avctx->keyint_min = VIDEO_FRAME_RATE;
+	avctx->keyint_min = ptr_output_ctx->frame_rate;//VIDEO_FRAME_RATE;
 	avctx->scenechange_threshold = 0;
-	avctx->gop_size = VIDEO_FRAME_RATE;
+	avctx->gop_size = ptr_output_ctx->frame_rate;//VIDEO_FRAME_RATE;
 
 	//other
 	avctx->global_quality = 6;
@@ -121,7 +121,7 @@ AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id){
 
 
 
-static AVStream * add_audio_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id ){
+static AVStream * add_audio_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id ,Output_Context *ptr_output_ctx){
 	AVCodecContext *avctx;
 	AVStream *st;
 
@@ -141,10 +141,10 @@ static AVStream * add_audio_stream (AVFormatContext *fmt_ctx ,enum CodecID codec
 	avctx->codec_type = AVMEDIA_TYPE_AUDIO;
 
 	avctx->sample_fmt = AV_SAMPLE_FMT_S16;
-	avctx->bit_rate = AUDIO_BIT_RATE;
-	avctx->sample_rate = AUDIO_SAMPLE_RATE;//ptr_input_ctx->audio_codec_ctx->sample_rate/*44100*/;
+	avctx->bit_rate = ptr_output_ctx->audio_rate;//AUDIO_BIT_RATE;
+	avctx->sample_rate = ptr_output_ctx->sample;//AUDIO_SAMPLE_RATE;//ptr_input_ctx->audio_codec_ctx->sample_rate/*44100*/;
 
-	avctx->channels = 2;
+	avctx->channels = ptr_output_ctx->channel;//2;
 
 	// some formats want stream headers to be separate(for example ,asfenc.c ,but not mpegts)
 	if (fmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
@@ -180,7 +180,7 @@ int init_output(Output_Context *ptr_output_ctx, char* output_file ){
 
     if (ptr_output_ctx->fmt->video_codec != CODEC_ID_NONE) {
 
-    	ptr_output_ctx->video_stream = add_video_stream(ptr_output_ctx->ptr_format_ctx, ptr_output_ctx->video_codec_id);
+    	ptr_output_ctx->video_stream = add_video_stream(ptr_output_ctx->ptr_format_ctx, ptr_output_ctx->video_codec_id ,ptr_output_ctx);
     	if(ptr_output_ctx->video_stream == NULL){
     		printf("in output ,add video stream failed \n");
     		exit(ADD_VIDEO_STREAM_FAIL);
@@ -189,7 +189,7 @@ int init_output(Output_Context *ptr_output_ctx, char* output_file ){
 
     if (ptr_output_ctx->fmt->audio_codec != CODEC_ID_NONE) {
 
-    	ptr_output_ctx->audio_stream = add_audio_stream(ptr_output_ctx->ptr_format_ctx, ptr_output_ctx->audio_codec_id );
+    	ptr_output_ctx->audio_stream = add_audio_stream(ptr_output_ctx->ptr_format_ctx, ptr_output_ctx->audio_codec_id ,ptr_output_ctx);
     	if(ptr_output_ctx->audio_stream == NULL){
     		printf(".in output ,add audio stream failed \n");
     		exit(ADD_AUDIO_STREAM_FAIL);
@@ -207,6 +207,7 @@ int init_output(Output_Context *ptr_output_ctx, char* output_file ){
     		ptr_output_ctx->video_stream->codec->width ,
     		ptr_output_ctx->video_stream->codec->height);
 
+    printf("size = %d ,width = %d \n" ,size ,ptr_output_ctx->video_stream->codec->width );
     ptr_output_ctx->pict_buf = av_malloc(size);
     if(ptr_output_ctx->pict_buf == NULL){
     	printf("pict allocate failed ...\n");
@@ -422,7 +423,7 @@ void encode_video_frame(Output_Context *ptr_output_ctx, AVFrame *pict,
 			//judge if key frame or not
 			if(ptr_output_ctx->pkt.flags && AV_PKT_FLAG_KEY){
 				//init segment_time
-				record_segment_time(ptr_output_ctx);
+			//	record_segment_time(ptr_output_ctx);
 
 			}
 
@@ -587,7 +588,7 @@ void encode_flush(Output_Context *ptr_output_ctx , int nb_ostreams){
 					//judge key frame
 					if(ptr_output_ctx->pkt.flags && AV_PKT_FLAG_KEY){
 						//init segment_time
-						record_segment_time(ptr_output_ctx);
+						//record_segment_time(ptr_output_ctx);
 
 					}
 

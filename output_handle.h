@@ -20,7 +20,7 @@ typedef struct {
 	//audio encodec buffer
 	uint8_t *audio_outbuf;
 	int audio_outbuf_size;
-	int16_t *samples;
+	//int16_t *samples;
 
 
 	/*	video information */
@@ -63,6 +63,15 @@ typedef struct {
 	FILE *fp_m3u8;
 	char *ts_prfix_name;
 	unsigned int segment_no;
+
+	//user can control input
+	int frame_rate;						 //frame rate
+	int width;							//video width
+	int height;							//video height
+	int video_rate;						//video bitrate
+	int audio_rate;						//audio bitrate
+	int sample;							//audio sample
+	int channel;						//audio channels
 
 }Output_Context;
 

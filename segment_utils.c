@@ -28,7 +28,7 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 	/*parse options*/
 	int next_option;
 	//short char option
-	const char * const short_option = "vhi:m:d:t:p:n:";
+	const char * const short_option = "vhi:m:d:t:p:n:r:w:e:v:a:s:c:";
 
 	//long char option struction array
 	const struct option long_option[] = {
@@ -40,6 +40,13 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 			{ "segment_time", 1, NULL, 't' }, //segment duration
 			{ "prefix_ts", 1, NULL, 'p' }, //the prefix in the m3u8 file
 			{ "m3u8_name", 1, NULL, 'n' }, //m3u8 name
+			{ "frame_rate", 1, NULL, 'r' }, //frame rate
+			{ "width", 1, NULL, 'w' }, //video width
+			{ "height", 1, NULL, 'e' }, //video height
+			{ "vb", 1, NULL, 'o' }, //video bitrate
+			{ "ab", 1, NULL, 'a' }, //audio bitrate
+			{ "sample", 1, NULL, 's' }, //audio sample
+			{ "channel", 1, NULL, 'c' }, //audio channels
 			{ NULL, 0, NULL, 0 }
 	};
 
@@ -63,6 +70,14 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 					"--segment_time		the segment duration time in second\n"
 					"--prefix_ts		the prefix of the ts file in the m3u8 file \n"
 					"--m3u8_name		name of the m3u8 file\n"
+					"--frame_rate		video frames per second\n"
+					"--width			width of the video \n"
+					"--height		    height of the video \n"
+					"--vb				the bitrate of the video \n"
+					"--ab				the bitrate of the audio\n"
+					"--sample			the samples of the audio\n"
+					"--channel			audio channel number\n"
+
 					"\n");
 			break;
 		case 'i': //input file
@@ -91,7 +106,36 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 		case 'n': //the m3u8 file
 			seg_union->m3u8_name = optarg;
 			break;
+		case 'r': //frame rate
+			seg_union->frame_rate = atoi(optarg);
+			break;
+		case 'w': //video width
+			seg_union->width = atoi(optarg);
+			break;
+		case 'e': //video height
+			seg_union->height = atoi(optarg);
+			break;
+		case 'o': //video bitrate 蛋疼的短选项
 
+			if(strchr(optarg ,'k') == NULL)
+				seg_union->video_rate = atoi(optarg);
+			else
+				seg_union->video_rate = atoi(optarg) * 1000;
+
+			break;
+		case 'a': //audio bitrate
+			if(strchr(optarg ,'k') == NULL)
+				seg_union->audio_rate = atoi(optarg);
+			else
+				seg_union->audio_rate = atoi(optarg) * 1000;
+
+			break;
+		case 's': //audio sample
+			seg_union->sample = atoi(optarg);
+			break;
+		case 'c': //audio channels
+			seg_union->channel = atoi(optarg);
+			break;
 		case '?':
 
 			printf("  invalid options  ,please use"

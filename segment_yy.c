@@ -58,6 +58,16 @@ int init_seg_union(Segment_U ** segment_union ,int argc ,char * argv[]) {   //ä¼
 		printf("ptr_output_ctx malloc failed .\n");
 		exit(MEMORY_MALLOC_FAIL);
 	}
+
+	//user can control input ,must before init_output function
+	seg_union->output_ctx->frame_rate				=		 seg_union->frame_rate;						 //frame rate
+	seg_union->output_ctx->width					=		 seg_union->width;							//video width
+	seg_union->output_ctx->height					=		 seg_union->height;							//video height
+	seg_union->output_ctx->video_rate				=		 seg_union->video_rate;						//video bitrate
+	seg_union->output_ctx->audio_rate				=		 seg_union->audio_rate;						//audio bitrate
+	seg_union->output_ctx->sample					=		 seg_union->sample;							//audio sample
+	seg_union->output_ctx->channel					=		 seg_union->channel;						//audio channels
+
 	//initialize the output context
 	init_output(seg_union->output_ctx ,seg_union->ts_name );
 	//open video and audio ,set video_out_buf and audio_out_buf
@@ -73,6 +83,7 @@ int init_seg_union(Segment_U ** segment_union ,int argc ,char * argv[]) {   //ä¼
 	seg_union->output_ctx->ts_name 					=		 seg_union->ts_name;
 	seg_union->output_ctx->full_m3u8_name			=		 seg_union->full_m3u8_name;
 	seg_union->output_ctx->mode_type				=		 seg_union->mode_type;
+
 	return 0;
 }
 
