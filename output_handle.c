@@ -63,7 +63,7 @@ AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id ,Ou
 	avctx->qmin = 10;
 	avctx->qmax = 51;
 	avctx->max_qdiff = 4;
-	avctx->crf = 22;
+	avctx->crf = 18;
 
 	avctx->rc_lookahead = 60;
 
@@ -427,7 +427,7 @@ void encode_video_frame(Output_Context *ptr_output_ctx, AVFrame *pict,
 			//judge if key frame or not
 			if(ptr_output_ctx->pkt.flags && AV_PKT_FLAG_KEY){
 				//init segment_time
-			//	record_segment_time(ptr_output_ctx);
+				record_segment_time(ptr_output_ctx);
 
 			}
 
@@ -592,7 +592,7 @@ void encode_flush(Output_Context *ptr_output_ctx , int nb_ostreams){
 					//judge key frame
 					if(ptr_output_ctx->pkt.flags && AV_PKT_FLAG_KEY){
 						//init segment_time
-						//record_segment_time(ptr_output_ctx);
+						record_segment_time(ptr_output_ctx);
 
 					}
 

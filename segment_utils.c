@@ -59,7 +59,7 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 		case 'v': 	//version
 			printf("**********************************\n");
 			printf("  segment version:%s \n\n", SEG_VERSION);
-			break;
+			exit(0);
 		case 'h': //help
 			fprintf(stderr,
 					"\n**********************************\n"
@@ -79,7 +79,8 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 					"--channel			audio channel number\n"
 
 					"\n");
-			break;
+			exit(0);
+//			break;
 		case 'i': //input file
 			if(seg_union->input_nb > MAX_INPUT_NUM){
 				printf("input files number is larger than the MAX_INPUT_NUM \n");
@@ -91,7 +92,6 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 			seg_union->input_nb ++;
 			break;
 		case 'm': //the program work mode
-			printf("mode_type = -%s-\n" ,optarg);
 			seg_union->mode_type = atoi(optarg);
 			break;
 		case 'd': //ts storage directory
@@ -136,13 +136,12 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 		case 'c': //audio channels
 			seg_union->channel = atoi(optarg);
 			break;
-		case '?':
+		case '?':		//invalid options
+			exit(0);
+//			break;
+		default:		//there is no options
+			break;
 
-			printf("  invalid options  ,please use"
-					" '%s  --help '  to find some information\n", argv[0]);
-			break;
-		default:
-			break;
 		}
 	} while (next_option != -1);
 
@@ -153,9 +152,17 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 			seg_union->m3u8_name == NULL ||
 			seg_union->segment_duration == 0 ||
 			seg_union->storage_dir == NULL ||
-			seg_union->ts_prfix_name == NULL){
+			seg_union->ts_prfix_name == NULL ||
+			seg_union->frame_rate == 0 	||
+			seg_union->width == 0 ||
+			seg_union->height == 0	||
+			seg_union->video_rate == 0 ||
+			seg_union->audio_rate == 0 ||
+			seg_union->sample  == 0 ||
+			seg_union->channel == 0){
 
-		printf("Segment Invalid argument ..\n");
+		printf("  Segment Invalid argument   ,please use"
+													" '%s  --help '  to find some information\n", argv[0]);
 		exit(SEG_INVALID_ARGUMENT);
 	}
 
@@ -220,7 +227,7 @@ void record_segment_time(Output_Context *ptr_output_ctx){
 
 	if(ptr_output_ctx->start_time_mark == 0){
 		ptr_output_ctx->start_time_mark = 1;
-		printf("混蛋。。。、\n");
+//		printf("混蛋。。。、\n");
 		ptr_output_ctx->prev_segment_time = av_q2d(ptr_output_ctx->video_stream->time_base) *
 													(ptr_output_ctx->pkt.pts )
 													- (double)ptr_output_ctx->ptr_format_ctx->start_time / AV_TIME_BASE;

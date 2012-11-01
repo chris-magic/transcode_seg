@@ -23,7 +23,6 @@ int init_seg_union(Segment_U ** segment_union ,int argc ,char * argv[]) {   //ä¼
 	Segment_U * seg_union =(*segment_union);
 	memset(seg_union ,0 ,sizeof(Segment_U));
 
-	printf("sizeof(Segment_U) = %d \n" ,sizeof(Segment_U));
 	seg_union->mode_type = -1;
 	seg_union->segment_no = 0;
 
