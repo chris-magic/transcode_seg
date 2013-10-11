@@ -15,7 +15,7 @@ typedef struct {
 
 	/*	audio information */
 	AVStream *audio_stream;
-	enum CodecID audio_codec_id;
+	enum AVCodecID audio_codec_id;
 
 	//audio encodec buffer
 	uint8_t *audio_outbuf;
@@ -25,7 +25,7 @@ typedef struct {
 
 	/*	video information */
 	AVStream *video_stream;
-	enum CodecID video_codec_id;
+	enum AVCodecID video_codec_id;
 	AVPacket pkt;					//video packet encode to output file
 
 	//video encoded buffer [out]

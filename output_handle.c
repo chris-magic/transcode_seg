@@ -20,7 +20,7 @@
 
 #include "segment_utils.h"
 //参考了output-example.c
-AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id ,Output_Context *ptr_output_ctx){
+AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum AVCodecID codec_id ,Output_Context *ptr_output_ctx){
 
 	AVCodecContext *avctx;
 	AVStream *st;
@@ -63,9 +63,6 @@ AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id ,Ou
 	avctx->qmin = 10;
 	avctx->qmax = 51;
 	avctx->max_qdiff = 4;
-	avctx->crf = 18;
-
-	avctx->rc_lookahead = 60;
 
 
 	avctx->time_base.den = ptr_output_ctx->frame_rate;//VIDEO_FRAME_RATE;
@@ -99,16 +96,8 @@ AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id ,Ou
 	avctx->noise_reduction = 0;
 	avctx->scenechange_threshold = 40;
 
-	avctx->flags2 = CODEC_FLAG2_MIXED_REFS;
-	avctx->flags2 |= CODEC_FLAG2_8X8DCT;
 	avctx->flags |= CODEC_FLAG_LOOP_FILTER;
 	avctx->me_cmp = FF_CMP_CHROMA;
-	avctx->flags2 |= CODEC_FLAG2_AUD;
-	avctx->flags2 |= CODEC_FLAG2_FASTPSKIP;
-	avctx->flags2 |= CODEC_FLAG2_BPYRAMID;   //allow B-frames to be used as references
-	avctx->flags2 |= CODEC_FLAG_NORMALIZE_AQP;
-	avctx->flags2 |= CODEC_FLAG2_WPRED;
-	avctx->flags2 |= CODEC_FLAG2_MBTREE;  //宏块层次Use macroblock tree ratecontrol
 
 	avctx->level = 21;
 	avctx->profile = FF_PROFILE_H264_MAIN;   // do not effective
@@ -121,7 +110,7 @@ AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id ,Ou
 
 
 
-static AVStream * add_audio_stream (AVFormatContext *fmt_ctx ,enum CodecID codec_id ,Output_Context *ptr_output_ctx){
+static AVStream * add_audio_stream (AVFormatContext *fmt_ctx ,enum AVCodecID codec_id ,Output_Context *ptr_output_ctx){
 	AVCodecContext *avctx;
 	AVStream *st;
 

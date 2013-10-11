@@ -1,7 +1,9 @@
-lib_path=/home/chris/work/ffmpeg/refs/aac_h264/lib
-include_path=/home/chris/work/ffmpeg/refs/aac_h264/include
+#lib_path=/home/chris/work/ffmpeg/refs/aac_h264/lib
+#include_path=/home/chris/work/ffmpeg/refs/aac_h264/include
+lib_path=/home/chris/work/ffmpeg/refs/ffmpeg-2.0.2/lib
+include_path=/home/chris/work/ffmpeg/refs/ffmpeg-2.0.2/include
 
-target=transcode1
+target=transcode2
 #src_file = test_main.c	\
 #			input_handle.c	\
 #			output_handle.c
