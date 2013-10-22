@@ -73,6 +73,8 @@ typedef struct {
 	int sample;							//audio sample
 	int channel;						//audio channels
 
+	//
+	unsigned int frame_count;			//frame count use for generate video frame pts
 }Output_Context;
 
 /*

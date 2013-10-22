@@ -131,9 +131,13 @@ static AVStream * add_audio_stream (AVFormatContext *fmt_ctx ,enum AVCodecID cod
 
 	avctx->sample_fmt = AV_SAMPLE_FMT_S16;
 	avctx->bit_rate = ptr_output_ctx->audio_rate;//AUDIO_BIT_RATE;
+	printf("ptr_output_ctx->audio_rate= %d................\n" ,ptr_output_ctx->audio_rate);
 	avctx->sample_rate = ptr_output_ctx->sample;//AUDIO_SAMPLE_RATE;//ptr_input_ctx->audio_codec_ctx->sample_rate/*44100*/;
 
-	avctx->channels = ptr_output_ctx->channel;//2;
+	avctx->channel_layout = AV_CH_LAYOUT_STEREO;
+	avctx->channels = av_get_channel_layout_nb_channels(avctx->channel_layout);
+	printf("avctx->channels = %d \n" ,avctx->channels);
+//	avctx->channels = ptr_output_ctx->channel;//2;
 
 	// some formats want stream headers to be separate(for example ,asfenc.c ,but not mpegts)
 	if (fmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
@@ -217,7 +221,7 @@ int init_output(Output_Context *ptr_output_ctx, char* output_file ){
     ptr_output_ctx->prev_segment_time = 0.0;
     ptr_output_ctx->curr_segment_time = 0.0;
     ptr_output_ctx->start_time_mark = 0;
-
+    ptr_output_ctx->frame_count = 0;
 
     /*output the file information */
     av_dump_format(ptr_output_ctx->ptr_format_ctx, 0, output_file, 1);
@@ -377,57 +381,92 @@ void encode_video_frame(Output_Context *ptr_output_ctx, AVFrame *pict,
 		nb_frames = lrintf(vdelta);
 
 	//set chris_count
+	//set chris_count
 	int tmp_count;
 	for (tmp_count = 0; tmp_count < nb_frames; tmp_count++) {
+		av_init_packet(&ptr_output_ctx->pkt);
 		//encode the image
 		int video_encoded_out_size;
 		pict->pts = frame_count++;
-
-		video_encoded_out_size = avcodec_encode_video(
+		ptr_output_ctx->frame_count = frame_count;
+		int got_output = 0;
+		video_encoded_out_size = avcodec_encode_video2(
 				ptr_output_ctx->video_stream->codec,
-				ptr_output_ctx->video_outbuf, ptr_output_ctx->video_outbuf_size,
-				pict);
-
+				&ptr_output_ctx->pkt ,
+				pict ,
+				&got_output);
 		if (video_encoded_out_size < 0) {
 			fprintf(stderr, "Error encoding video frame\n");
 			exit(VIDEO_ENCODE_ERROR);
 		}
 
-//		if (video_encoded_out_size == 0)  //the first several number  pict ,there will no data to output because of the AVCodecContext buffer
-//			return;
-		//in here ,video_encodec_out_size > 0
-		if(video_encoded_out_size > 0){
-			//AVPacket pkt; //use ptr_output_ctx->pkt instead
-			av_init_packet(&ptr_output_ctx->pkt);
-			ptr_output_ctx->pkt.stream_index = ptr_output_ctx->video_stream->index;
-			ptr_output_ctx->pkt.data = ptr_output_ctx->video_outbuf; // packet data will be allocated by the encoder
-			ptr_output_ctx->pkt.size = video_encoded_out_size;
+		if(got_output){
 
-			if (ptr_output_ctx->video_stream->codec->coded_frame->pts
+		//	printf("pts = %ld\n" ,ptr_output_ctx->pkt.pts);
+			ptr_output_ctx->pkt.stream_index = ptr_output_ctx->video_stream->index;
+
+			if (ptr_output_ctx->pkt.pts
 					!= AV_NOPTS_VALUE)
 				ptr_output_ctx->pkt.pts = av_rescale_q(
-						ptr_output_ctx->video_stream->codec->coded_frame->pts,
+						ptr_output_ctx->pkt.pts ,  //
 						ptr_output_ctx->video_stream->codec->time_base,
 						ptr_output_ctx->video_stream->time_base);
 
-			if (ptr_output_ctx->video_stream->codec->coded_frame->key_frame)
-				ptr_output_ctx->pkt.flags |= AV_PKT_FLAG_KEY;
-
+			//printf("after pts = %ld ,time_base in avcodecContext %f \n" ,ptr_output_ctx->pkt.pts , 1/av_q2d(ptr_output_ctx->video_stream->codec->time_base));
+//			printf("time_base in stream %f \n"  ,1/av_q2d(ptr_output_ctx->video_stream->time_base));
+#if 0
 			//judge if key frame or not
-			if(ptr_output_ctx->pkt.flags && AV_PKT_FLAG_KEY){
+			if(ptr_output_ctx->pkt.flags & AV_PKT_FLAG_KEY){
 				//init segment_time
 				record_segment_time(ptr_output_ctx);
-
 			}
-
+#endif
 			av_write_frame(ptr_output_ctx->ptr_format_ctx, &ptr_output_ctx->pkt);
-
 			av_free_packet(&ptr_output_ctx->pkt);
 		}
 
 	}
-
 }
+//void encode_audio_frame(Output_Context *ptr_output_ctx , uint8_t *buf ,int buf_size){
+//
+//	int ret;
+//	AVCodecContext *c = ptr_output_ctx->audio_stream->codec;
+//
+//
+//	//packet for output
+//	AVPacket pkt;
+//	av_init_packet(&pkt);
+//	pkt.data = NULL;
+//	pkt.size = 0;
+//	//frame for input
+//	AVFrame *frame = avcodec_alloc_frame();
+//	if (frame == NULL) {
+//		printf("frame malloc failed ...\n");
+//		exit(1);
+//	}
+//
+//	frame->nb_samples = buf_size /
+//					(c->channels * av_get_bytes_per_sample(c->sample_fmt));
+//
+//	if ((ret = avcodec_fill_audio_frame(frame, c->channels, AV_SAMPLE_FMT_S16,
+//				buf, buf_size, 1)) < 0) {
+//		av_log(NULL, AV_LOG_FATAL, ".Audio encoding failed\n");
+//		exit(AUDIO_ENCODE_ERROR);
+//	}
+//
+//	int got_packet = 0;
+//	if (avcodec_encode_audio2(c, &pkt, frame, &got_packet) < 0) {
+//		av_log(NULL, AV_LOG_FATAL, "..Audio encoding failed\n");
+//		exit(AUDIO_ENCODE_ERROR);
+//	}
+//	pkt.pts = 0;
+//	pkt.stream_index = ptr_output_ctx->audio_stream->index;
+//
+//	av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt);
+//
+//	av_free(frame);
+//	av_free_packet(&pkt);
+//}
 
 
 void encode_audio_frame(Output_Context *ptr_output_ctx , uint8_t *buf ,int buf_size){
@@ -448,27 +487,41 @@ void encode_audio_frame(Output_Context *ptr_output_ctx , uint8_t *buf ,int buf_s
 		exit(1);
 	}
 
+	static unsigned int audio_count = 0;
+
 	frame->nb_samples = buf_size /
 					(c->channels * av_get_bytes_per_sample(c->sample_fmt));
+
+	frame->pts = audio_count ;
+	audio_count += frame->nb_samples;
+
 
 	if ((ret = avcodec_fill_audio_frame(frame, c->channels, AV_SAMPLE_FMT_S16,
 				buf, buf_size, 1)) < 0) {
 		av_log(NULL, AV_LOG_FATAL, ".Audio encoding failed\n");
 		exit(AUDIO_ENCODE_ERROR);
 	}
-
 	int got_packet = 0;
 	if (avcodec_encode_audio2(c, &pkt, frame, &got_packet) < 0) {
 		av_log(NULL, AV_LOG_FATAL, "..Audio encoding failed\n");
 		exit(AUDIO_ENCODE_ERROR);
 	}
-	pkt.pts = 0;
-	pkt.stream_index = ptr_output_ctx->audio_stream->index;
 
-	av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt);
+	if(got_packet){
+		if (pkt.pts != AV_NOPTS_VALUE) {
+
+			pkt.pts = av_rescale_q(pkt.pts,
+										ptr_output_ctx->audio_stream->codec->time_base,
+										ptr_output_ctx->audio_stream->time_base);
+
+		}
+		pkt.stream_index = ptr_output_ctx->audio_stream->index;
+		av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt);
+		av_free_packet(&pkt);
+	}
 
 	av_free(frame);
-	av_free_packet(&pkt);
+
 }
 
 
@@ -551,10 +604,12 @@ void encode_flush(Output_Context *ptr_output_ctx , int nb_ostreams){
 			/*video stream*/
 			case AVMEDIA_TYPE_VIDEO:
 			{
-				 int nEncodedBytes = avcodec_encode_video(
+				 int got_output = 0;
+				 int nEncodedBytes = avcodec_encode_video2(
 								ptr_output_ctx->video_stream->codec,
-								ptr_output_ctx->video_outbuf, ptr_output_ctx->video_outbuf_size,
-								NULL);
+								&pkt,
+								NULL ,
+								&got_output);
 
 				if (nEncodedBytes < 0) {
 					av_log(NULL, AV_LOG_FATAL, "Video encoding failed\n");
@@ -562,16 +617,15 @@ void encode_flush(Output_Context *ptr_output_ctx , int nb_ostreams){
 				}
 
 				printf("video ...........\n");
-				if(nEncodedBytes > 0){
+				if(got_output){
 					pkt.stream_index = ptr_output_ctx->video_stream->index;
-					pkt.data = ptr_output_ctx->video_outbuf; // packet data will be allocated by the encoder
-					pkt.size = nEncodedBytes;
 
 					if (ptr_output_ctx->video_stream->codec->coded_frame->pts
 							!= AV_NOPTS_VALUE)
+						pkt.pts = ptr_output_ctx->frame_count ++;
 						pkt.pts =
 								av_rescale_q(
-										ptr_output_ctx->video_stream->codec->coded_frame->pts,
+										pkt.pts,
 										ptr_output_ctx->video_stream->codec->time_base,
 										ptr_output_ctx->video_stream->time_base);
 
@@ -609,118 +663,79 @@ void encode_flush(Output_Context *ptr_output_ctx , int nb_ostreams){
 
 }
 
-
 void do_audio_out(Output_Context *ptr_output_ctx ,Input_Context *ptr_input_ctx ,AVFrame *decoded_frame){
 
-	uint8_t *buftmp;
-	int64_t audio_buf_size, size_out;
+    AVCodecContext *enc = ptr_output_ctx->audio_stream->codec;
+    //AVCodecContext *dec = ptr_input_ctx->audio_codec_ctx;
 
-	int frame_bytes;
-	AVCodecContext *enc = ptr_output_ctx->audio_stream->codec;
-	AVCodecContext *dec = ptr_input_ctx->audio_codec_ctx;
-	int osize = av_get_bytes_per_sample(enc->sample_fmt);
-	int isize = av_get_bytes_per_sample(dec->sample_fmt);
-
-	/*	in buf ,is the decoded audio data	*/
-	uint8_t *buf = ptr_input_ctx->audio_decode_frame->data[0];
-	int size = ptr_input_ctx->audio_decode_frame->nb_samples * dec->channels * isize;
-
-	int64_t allocated_for_size = size;
-
-/*need_realloc:*/
-	audio_buf_size = (allocated_for_size + isize * dec->channels - 1) / (isize * dec->channels);
-	audio_buf_size = (audio_buf_size * enc->sample_rate + dec->sample_rate) / dec->sample_rate;
-	audio_buf_size = audio_buf_size * 2 + 10000; // safety factors for the deprecated resampling API
-	audio_buf_size = FFMAX(audio_buf_size, enc->frame_size);
-	audio_buf_size *= osize * enc->channels;
-
-	if (audio_buf_size > INT_MAX) {
-		av_log(NULL, AV_LOG_FATAL, "Buffer sizes too large\n");
-		exit(1);
-	}
-
-	av_fast_malloc(&(ptr_output_ctx->audio_buf), &(ptr_output_ctx->allocated_audio_buf_size), audio_buf_size);
-	if (!ptr_output_ctx->audio_buf) {
-		av_log(NULL, AV_LOG_FATAL, "Out of memory in do_audio_out\n");
-		exit(1);
-	}
-
-
-	/*	judge resample or not*/
-    if (enc->channels != dec->channels
-    		|| enc->sample_fmt != dec->sample_fmt
-    		|| enc->sample_rate!= dec->sample_rate
-    )
-    	ptr_output_ctx->audio_resample = 1;
-    /*	init SwrContext	,perform only one time	*/
-	if (ptr_output_ctx->audio_resample && !ptr_output_ctx->swr) {
-
-		printf("ptr_output_ctx->audio_resample = %d ,and we need resample \n" ,ptr_output_ctx->audio_resample);
-		ptr_output_ctx->swr = swr_alloc_set_opts(NULL, enc->channel_layout,
-				enc->sample_fmt, enc->sample_rate, dec->channel_layout,
-				dec->sample_fmt, dec->sample_rate, 0, NULL);
-
-		if (av_opt_set_int(ptr_output_ctx->swr, "ich", dec->channels, 0) < 0) {
-			av_log(NULL, AV_LOG_FATAL,
-					"Unsupported number of input channels\n");
-			exit(1);
-		}
-		if (av_opt_set_int(ptr_output_ctx->swr, "och", enc->channels, 0) < 0) {
-			av_log(NULL, AV_LOG_FATAL,
-					"Unsupported number of output channels\n");
+	static uint8_t  **dst_data = NULL;
+	static int dst_linesize;
+	static int dst_nb_samples, max_dst_nb_samples;  //only init once time
+	static int dst_nb_channels ;
+	if(ptr_output_ctx->swr == NULL){  // make sure ,this operation perform only once time
+		ptr_output_ctx->swr = swr_alloc();
+		if (!ptr_output_ctx->swr) {
+			printf("swr context failed ...\n");
 			exit(1);
 		}
 
-		if (ptr_output_ctx->swr && swr_init(ptr_output_ctx->swr) < 0) {
+		av_opt_set_int(ptr_output_ctx->swr, "in_channel_layout", decoded_frame->channel_layout, 0);
+		av_opt_set_int(ptr_output_ctx->swr, "in_sample_rate", decoded_frame->sample_rate, 0);
+		av_opt_set_sample_fmt(ptr_output_ctx->swr, "in_sample_fmt", decoded_frame->format, 0);
+
+		av_opt_set_int(ptr_output_ctx->swr, "out_channel_layout", enc->channel_layout, 0);
+		av_opt_set_int(ptr_output_ctx->swr, "out_sample_rate", enc->sample_rate, 0);
+		av_opt_set_sample_fmt(ptr_output_ctx->swr, "out_sample_fmt", enc->sample_fmt, 0);
+
+		if (swr_init(ptr_output_ctx->swr) < 0) {
 			av_log(NULL, AV_LOG_FATAL, "swr_init() failed\n");
 			swr_free(&ptr_output_ctx->swr);
 		}
 
-		if (!ptr_output_ctx->swr) {
-			av_log(NULL, AV_LOG_FATAL,
-					"Can not resample %d channels @ %d Hz to %d channels @ %d Hz\n",
-					dec->channels, dec->sample_rate, enc->channels,
-					enc->sample_rate);
+		/* compute the number of converted samples: buffering is avoided
+		 * ensuring that the output buffer will contain at least all the
+		 * converted input samples */
+		max_dst_nb_samples = dst_nb_samples = av_rescale_rnd(
+				decoded_frame->nb_samples, enc->sample_rate, decoded_frame->sample_rate, AV_ROUND_UP);
+		/* buffer is going to be directly written to a rawaudio file, no alignment */
+		dst_nb_channels = av_get_channel_layout_nb_channels(enc->channel_layout);
+		int ret = av_samples_alloc_array_and_samples(&dst_data, &dst_linesize,
+				dst_nb_channels, dst_nb_samples, enc->sample_fmt, 0);
+
+		if (ret < 0) {
+			fprintf(stderr, "Could not allocate destination samples\n");
 			exit(1);
 		}
 
 	}
+	int ret1 = swr_convert(ptr_output_ctx->swr, dst_data, dst_nb_samples,
+			(const uint8_t **)ptr_input_ctx->audio_decode_frame->data,
+			ptr_input_ctx->audio_decode_frame->nb_samples);
 
-	if(ptr_output_ctx->audio_resample ){
+	int dst_bufsize = av_samples_get_buffer_size(&dst_linesize, dst_nb_channels,
+			ret1, enc->sample_fmt, 1);
 
-		//swr_convert
-		buftmp = ptr_output_ctx->audio_buf;
-		size_out = swr_convert(ptr_output_ctx->swr, ( uint8_t*[]) {buftmp},audio_buf_size / (enc->channels * osize),
-															 (const uint8_t*[]){buf   }, size / (dec->channels * isize));
-		size_out = size_out * enc->channels * osize;
-	}else {
-		buftmp = buf ;
-		size_out = size;
+	if (av_fifo_realloc2(ptr_output_ctx->fifo,
+			av_fifo_size(ptr_output_ctx->fifo) + dst_bufsize) < 0) {
+		av_log(NULL, AV_LOG_FATAL, "av_fifo_realloc2() failed\n");
+		exit(1);
+	}
+	av_fifo_generic_write(ptr_output_ctx->fifo, dst_data[0], dst_bufsize, NULL);
 
+	int frame_bytes = ptr_output_ctx->audio_stream->codec->frame_size
+			* av_get_bytes_per_sample(AV_SAMPLE_FMT_S16) * dst_nb_channels;
+
+	ptr_output_ctx->audio_buf = malloc(frame_bytes);
+	while (av_fifo_size(ptr_output_ctx->fifo) >= frame_bytes) {
+		av_fifo_generic_read(ptr_output_ctx->fifo, ptr_output_ctx->audio_buf,
+				frame_bytes, NULL);
+		encode_audio_frame(ptr_output_ctx, ptr_output_ctx->audio_buf,
+				frame_bytes);
 	}
 
-
-	//write data
-
-//		printf("av_fifo_size(ptr_output_ctx->fifo) = %d \n" ,av_fifo_size(ptr_output_ctx->fifo));
-		if (av_fifo_realloc2(ptr_output_ctx->fifo,
-				av_fifo_size(ptr_output_ctx->fifo) + size_out) < 0) {
-			av_log(NULL, AV_LOG_FATAL, "av_fifo_realloc2() failed\n");
-			exit(1);
-		}
-		av_fifo_generic_write(ptr_output_ctx->fifo, buftmp, size_out, NULL);
-
-
-		frame_bytes = enc->frame_size * osize * enc->channels;
-
-		while (av_fifo_size(ptr_output_ctx->fifo) >= frame_bytes) {
-//			printf("av_fifo_size(ost->fifo) = %d ,frame_bytes = %d\n" ,av_fifo_size(ptr_output_ctx->fifo) ,frame_bytes);
-			av_fifo_generic_read(ptr_output_ctx->fifo, ptr_output_ctx->audio_buf, frame_bytes, NULL);
-			encode_audio_frame(ptr_output_ctx, ptr_output_ctx->audio_buf, frame_bytes);
-		}
-
+	free(ptr_output_ctx->audio_buf);
+	//swr_free(&ptr_output_ctx->swr);
 }
-
 
 void free_output_memory(Output_Context *ptr_output_ctx){
 

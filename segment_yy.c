@@ -133,7 +133,7 @@ int seg_transcode_main(Segment_U * seg_union){
 						ptr_input_ctx->yuv_frame, &got_picture, &ptr_input_ctx->pkt);
 
 				if (got_picture) {
-					//encode video
+					//encode video (decoded video data in ptr_input_ctx->yuv_frame)
 					//input stream 的问题。
 					ptr_output_ctx->sync_ipts = av_q2d(ptr_input_ctx->ptr_format_ctx->streams[ptr_input_ctx->video_index]->time_base) *
 							(ptr_input_ctx->yuv_frame->best_effort_timestamp  )
@@ -192,7 +192,6 @@ int seg_transcode_main(Segment_U * seg_union){
 				av_free_packet(&ptr_input_ctx->pkt);
 
 		}//endwhile
-
 		double file_duration = ptr_input_ctx->ptr_format_ctx->duration / AV_TIME_BASE
 					+ (double)( ptr_input_ctx->ptr_format_ctx->duration % AV_TIME_BASE ) / AV_TIME_BASE;
 
@@ -200,8 +199,9 @@ int seg_transcode_main(Segment_U * seg_union){
 		ptr_output_ctx->base_ipts  += file_duration;  //completed files sum time duration
 		printf("end while ......,time_base = %f .............> \n" ,ptr_output_ctx->base_ipts  );
 		ptr_output_ctx->audio_resample = 0;
-		sws_freeContext(ptr_output_ctx->img_convert_ctx);
+
 		free_input(ptr_input_ctx);
+		sws_freeContext(ptr_output_ctx->img_convert_ctx);
     } //end for
 
 	printf("before flush ,ptr_output_ctx->ptr_format_ctx->nb_streams = %d \n\n" ,ptr_output_ctx->ptr_format_ctx->nb_streams);
