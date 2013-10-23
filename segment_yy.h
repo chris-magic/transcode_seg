@@ -56,6 +56,7 @@ typedef struct Segment_U{
 	int sample;							//audio sample
 	int channel;						//audio channels
 
+	char *vcodec;						//vcodec value is "copy" or "libx264" ,currently only support this two values
 
 }Segment_U;
 /*

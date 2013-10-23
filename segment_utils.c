@@ -28,7 +28,7 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 	/*parse options*/
 	int next_option;
 	//short char option
-	const char * const short_option = "vhi:m:d:t:p:n:r:w:e:v:a:s:c:";
+	const char * const short_option = "vhi:m:d:1:t:p:n:r:w:e:v:a:s:c:";
 
 	//long char option struction array
 	const struct option long_option[] = {
@@ -37,6 +37,7 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 			{ "input", 1, NULL, 'i' }, //input file
 			{ "mode", 1, NULL, 'm' }, //execute mode
 			{ "dir", 1, NULL, 'd' }, //ts storage directory
+			{ "vcodec", 1, NULL, '1' },  //video copy or libx264
 			{ "segment_time", 1, NULL, 't' }, //segment duration
 			{ "prefix_ts", 1, NULL, 'p' }, //the prefix in the m3u8 file
 			{ "m3u8_name", 1, NULL, 'n' }, //m3u8 name
@@ -77,7 +78,7 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 					"--ab				the bitrate of the audio\n"
 					"--sample			the samples of the audio\n"
 					"--channel			audio channel number\n"
-
+					"--vcodec			value 'copy' or 'libx264'\n"
 					"\n");
 			exit(0);
 //			break;
@@ -99,6 +100,10 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 			break;
 		case 't': //segment duration
 			seg_union->segment_duration = atof(optarg);
+			break;
+		case '1':
+			seg_union->vcodec = optarg;
+			printf("seg_union->vcodec = -%s- \n" ,seg_union->vcodec);
 			break;
 		case 'p': //the ts file in the m3u8 file
 			seg_union->ts_prfix_name = optarg;
@@ -227,7 +232,7 @@ void record_segment_time(Output_Context *ptr_output_ctx){
 
 	if(ptr_output_ctx->start_time_mark == 0){
 		ptr_output_ctx->start_time_mark = 1;
-//		printf("混蛋。。。、\n");
+		printf("混蛋。。。、\n");
 		ptr_output_ctx->prev_segment_time = av_q2d(ptr_output_ctx->video_stream->time_base) *
 													(ptr_output_ctx->pkt.pts )
 													- (double)ptr_output_ctx->ptr_format_ctx->start_time / AV_TIME_BASE;
@@ -249,7 +254,7 @@ void record_segment_time(Output_Context *ptr_output_ctx){
 		avio_close(ptr_output_ctx->ptr_format_ctx->pb);
 
 		printf("complete the %d.ts ,and write the m3u8 file..\n" ,ptr_output_ctx->segment_no);
-		write_m3u8_body( ptr_output_ctx ,ptr_output_ctx->curr_segment_time - ptr_output_ctx->prev_segment_time);
+		write_m3u8_body( ptr_output_ctx ,ptr_output_ctx->curr_segment_time - ptr_output_ctx->prev_segment_time ,0 );
 		//concat ts file name
 		sprintf(&(ptr_output_ctx->ts_name[ptr_output_ctx->dir_name_len]) ,"%s-%d.ts" ,ptr_output_ctx->ts_prfix_name ,++ptr_output_ctx->segment_no);
 		if (avio_open(&(ptr_output_ctx->ptr_format_ctx->pb), ptr_output_ctx->ts_name, AVIO_FLAG_WRITE) < 0) {
@@ -281,7 +286,7 @@ void write_m3u8_header(Output_Context *ptr_output_ctx){
 }
 
 
-void write_m3u8_body(Output_Context *ptr_output_ctx ,double segment_duration){
+void write_m3u8_body(Output_Context *ptr_output_ctx ,double segment_duration ,int end_mark){
 
 //	while(1);
 	//vod
@@ -293,8 +298,14 @@ void write_m3u8_body(Output_Context *ptr_output_ctx ,double segment_duration){
 			fprintf(stderr ,"Could not open m3u8 file %s...\n" ,ptr_output_ctx->full_m3u8_name);
 			exit(OPEN_M3U8_FAIL);
 		}
-		fprintf(ptr_output_ctx->fp_m3u8 ,"#EXTINF:%.02f,\n%s-%u.ts\n" ,segment_duration ,ptr_output_ctx->ts_prfix_name ,
-									ptr_output_ctx->segment_no);
+
+		if(0 == end_mark){
+			fprintf(ptr_output_ctx->fp_m3u8 ,"#EXTINF:%.02f,\n%s-%u.ts\n" ,segment_duration ,ptr_output_ctx->ts_prfix_name ,
+										ptr_output_ctx->segment_no);
+		}else{ //file eof
+			fprintf(ptr_output_ctx->fp_m3u8 ,"#EXTINF:%.02f,\n%s-%u.ts\n#EXT-X-ENDLIST\n" ,segment_duration ,ptr_output_ctx->ts_prfix_name ,
+										ptr_output_ctx->segment_no);
+		}
 
 		fclose(ptr_output_ctx->fp_m3u8);
 	}

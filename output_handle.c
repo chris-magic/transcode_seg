@@ -19,8 +19,59 @@
 #include "chris_global.h"
 
 #include "segment_utils.h"
+
+//use to copy video stream
+AVStream *add_output_stream(AVFormatContext *output_format_context, AVStream *input_stream) {
+    AVCodecContext *input_codec_context;
+    AVCodecContext *output_codec_context;
+    AVStream *output_stream;
+
+    output_stream = avformat_new_stream(output_format_context, 0);
+    if (!output_stream) {
+        fprintf(stderr, "Could not allocate stream\n");
+        exit(1);
+    }
+
+    input_codec_context = input_stream->codec;
+    output_codec_context = output_stream->codec;
+
+    output_codec_context->codec_id = input_codec_context->codec_id;
+    output_codec_context->codec_type = input_codec_context->codec_type;
+    output_codec_context->codec_tag = input_codec_context->codec_tag;
+    output_codec_context->bit_rate = input_codec_context->bit_rate;
+    output_codec_context->extradata = input_codec_context->extradata;
+    output_codec_context->extradata_size = input_codec_context->extradata_size;
+
+    if(av_q2d(input_codec_context->time_base) * input_codec_context->ticks_per_frame > av_q2d(input_stream->time_base) && av_q2d(input_stream->time_base) < 1.0/1000) {
+        //in here
+    	output_codec_context->time_base = input_codec_context->time_base;
+        output_codec_context->time_base.num *= input_codec_context->ticks_per_frame;
+    }
+    else {
+    	//printf("else \n");
+        output_codec_context->time_base = input_stream->time_base;
+    }
+//    printf("time_base = %f \n"  ,1/av_q2d(output_codec_context->time_base));
+//    while(1);
+    switch (input_codec_context->codec_type) {
+        case AVMEDIA_TYPE_VIDEO:
+            output_codec_context->pix_fmt = input_codec_context->pix_fmt;
+            output_codec_context->width = input_codec_context->width;
+            output_codec_context->height = input_codec_context->height;
+            output_codec_context->has_b_frames = input_codec_context->has_b_frames;
+
+            if (output_format_context->oformat->flags & AVFMT_GLOBALHEADER) {
+                output_codec_context->flags |= CODEC_FLAG_GLOBAL_HEADER;
+            }
+            break;
+    default:
+        break;
+    }
+
+    return output_stream;
+}
 //参考了output-example.c
-AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum AVCodecID codec_id ,Output_Context *ptr_output_ctx){
+static AVStream * add_video_stream (AVFormatContext *fmt_ctx ,enum AVCodecID codec_id ,Output_Context *ptr_output_ctx){
 
 	AVCodecContext *avctx;
 	AVStream *st;
@@ -146,7 +197,7 @@ static AVStream * add_audio_stream (AVFormatContext *fmt_ctx ,enum AVCodecID cod
 	return st;
 }
 
-int init_output(Output_Context *ptr_output_ctx, char* output_file ){
+int init_output(Output_Context *ptr_output_ctx, char* output_file ,Input_Context *input_ctx){
 
 	//set AVOutputFormat
     /* allocate the output media context */
@@ -173,11 +224,18 @@ int init_output(Output_Context *ptr_output_ctx, char* output_file ){
 
     if (ptr_output_ctx->fmt->video_codec != CODEC_ID_NONE) {
 
-    	ptr_output_ctx->video_stream = add_video_stream(ptr_output_ctx->ptr_format_ctx, ptr_output_ctx->video_codec_id ,ptr_output_ctx);
+    	if(ptr_output_ctx->vcodec_copy_mark == 0){ //libx264 reencode
+        	ptr_output_ctx->video_stream = add_video_stream(ptr_output_ctx->ptr_format_ctx, ptr_output_ctx->video_codec_id ,ptr_output_ctx);
+
+    	}else if(ptr_output_ctx->vcodec_copy_mark == 1){ //format
+    		ptr_output_ctx->video_stream = add_output_stream(ptr_output_ctx->ptr_format_ctx, input_ctx->ptr_format_ctx->streams[input_ctx->video_index]);
+    	}
+
     	if(ptr_output_ctx->video_stream == NULL){
     		printf("in output ,add video stream failed \n");
     		exit(ADD_VIDEO_STREAM_FAIL);
     	}
+
     }
 
     if (ptr_output_ctx->fmt->audio_codec != CODEC_ID_NONE) {
@@ -338,7 +396,9 @@ static void open_audio (Output_Context *ptr_output_ctx ,AVStream * st){
 
 void open_stream_codec(Output_Context *ptr_output_ctx){
 
-	open_video (ptr_output_ctx ,ptr_output_ctx->video_stream);
+	if(ptr_output_ctx->vcodec_copy_mark == 0){ //use libx264 codec reencode
+		open_video (ptr_output_ctx ,ptr_output_ctx->video_stream);
+	}
 
 	open_audio (ptr_output_ctx ,ptr_output_ctx->audio_stream);
 
@@ -414,7 +474,7 @@ void encode_video_frame(Output_Context *ptr_output_ctx, AVFrame *pict,
 
 			//printf("after pts = %ld ,time_base in avcodecContext %f \n" ,ptr_output_ctx->pkt.pts , 1/av_q2d(ptr_output_ctx->video_stream->codec->time_base));
 //			printf("time_base in stream %f \n"  ,1/av_q2d(ptr_output_ctx->video_stream->time_base));
-#if 0
+#if 1
 			//judge if key frame or not
 			if(ptr_output_ctx->pkt.flags & AV_PKT_FLAG_KEY){
 				//init segment_time
@@ -427,47 +487,6 @@ void encode_video_frame(Output_Context *ptr_output_ctx, AVFrame *pict,
 
 	}
 }
-//void encode_audio_frame(Output_Context *ptr_output_ctx , uint8_t *buf ,int buf_size){
-//
-//	int ret;
-//	AVCodecContext *c = ptr_output_ctx->audio_stream->codec;
-//
-//
-//	//packet for output
-//	AVPacket pkt;
-//	av_init_packet(&pkt);
-//	pkt.data = NULL;
-//	pkt.size = 0;
-//	//frame for input
-//	AVFrame *frame = avcodec_alloc_frame();
-//	if (frame == NULL) {
-//		printf("frame malloc failed ...\n");
-//		exit(1);
-//	}
-//
-//	frame->nb_samples = buf_size /
-//					(c->channels * av_get_bytes_per_sample(c->sample_fmt));
-//
-//	if ((ret = avcodec_fill_audio_frame(frame, c->channels, AV_SAMPLE_FMT_S16,
-//				buf, buf_size, 1)) < 0) {
-//		av_log(NULL, AV_LOG_FATAL, ".Audio encoding failed\n");
-//		exit(AUDIO_ENCODE_ERROR);
-//	}
-//
-//	int got_packet = 0;
-//	if (avcodec_encode_audio2(c, &pkt, frame, &got_packet) < 0) {
-//		av_log(NULL, AV_LOG_FATAL, "..Audio encoding failed\n");
-//		exit(AUDIO_ENCODE_ERROR);
-//	}
-//	pkt.pts = 0;
-//	pkt.stream_index = ptr_output_ctx->audio_stream->index;
-//
-//	av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt);
-//
-//	av_free(frame);
-//	av_free_packet(&pkt);
-//}
-
 
 void encode_audio_frame(Output_Context *ptr_output_ctx , uint8_t *buf ,int buf_size){
 
@@ -515,6 +534,7 @@ void encode_audio_frame(Output_Context *ptr_output_ctx , uint8_t *buf ,int buf_s
 										ptr_output_ctx->audio_stream->time_base);
 
 		}
+		pkt.dts = pkt.pts;		//audio packet dts set method
 		pkt.stream_index = ptr_output_ctx->audio_stream->index;
 		av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt);
 		av_free_packet(&pkt);
@@ -546,114 +566,118 @@ void encode_flush(Output_Context *ptr_output_ctx , int nb_ostreams){
 		int stop_encoding = 0;
 
 		for (;;){
-			AVPacket pkt;
-			int fifo_bytes;
-			av_init_packet(&pkt);
-			pkt.data = NULL;
-			pkt.size = 0;
+            AVPacket pkt;
+            int fifo_bytes;
+            av_init_packet(&pkt);
+            pkt.data = NULL;
+            pkt.size = 0;
 
-			switch (st->codec->codec_type) {
-			/*audio stream*/
-			case AVMEDIA_TYPE_AUDIO:
-			{
+            switch (st->codec->codec_type) {
+            /*audio stream*/
+            case AVMEDIA_TYPE_AUDIO:
+            {
 
 
-				fifo_bytes = av_fifo_size(ptr_output_ctx->fifo);
-				if (fifo_bytes > 0) {
-					/* encode any samples remaining in fifo */
-					int frame_bytes = fifo_bytes;
-					av_fifo_generic_read(ptr_output_ctx->fifo, ptr_output_ctx->audio_buf, fifo_bytes, NULL);
+                    fifo_bytes = av_fifo_size(ptr_output_ctx->fifo);
+                    if (fifo_bytes > 0) {
+                            /* encode any samples remaining in fifo */
+                            int frame_bytes = fifo_bytes;
+                            av_fifo_generic_read(ptr_output_ctx->fifo, ptr_output_ctx->audio_buf, fifo_bytes, NULL);
 
-					/* pad last frame with silence if needed */
-					frame_bytes = enc->frame_size * enc->channels *
-								  av_get_bytes_per_sample(enc->sample_fmt);
-					if (ptr_output_ctx->allocated_audio_buf_size < frame_bytes)
-						exit(1);
-					generate_silence(ptr_output_ctx->audio_buf+fifo_bytes, enc->sample_fmt, frame_bytes - fifo_bytes);
+                            /* pad last frame with silence if needed */
+                            frame_bytes = enc->frame_size * enc->channels *
+                                                      av_get_bytes_per_sample(enc->sample_fmt);
+                            if (ptr_output_ctx->allocated_audio_buf_size < frame_bytes)
+                                    exit(1);
+                            generate_silence(ptr_output_ctx->audio_buf+fifo_bytes, enc->sample_fmt, frame_bytes - fifo_bytes);
 
-					printf("audio ...........\n");
-					encode_audio_frame(ptr_output_ctx, ptr_output_ctx->audio_buf, frame_bytes);
+                            printf("audio ...........\n");
+                            encode_audio_frame(ptr_output_ctx, ptr_output_ctx->audio_buf, frame_bytes);
 
-				} else {
-					/* flush encoder with NULL frames until it is done
-					   returning packets */
-					int got_packet = 0;
-					int ret1;
-					ret1 = avcodec_encode_audio2(enc, &pkt, NULL, &got_packet);
-					if ( ret1 < 0) {
-						av_log(NULL, AV_LOG_FATAL, "..Audio encoding failed\n");
-						exit(AUDIO_ENCODE_ERROR);
+                    } else {
+                            /* flush encoder with NULL frames until it is done
+                               returning packets */
+                            int got_packet = 0;
+                            int ret1;
+                            ret1 = avcodec_encode_audio2(enc, &pkt, NULL, &got_packet);
+                            if ( ret1 < 0) {
+                                    av_log(NULL, AV_LOG_FATAL, "..Audio encoding failed\n");
+                                    exit(AUDIO_ENCODE_ERROR);
+                            }
+
+                            printf("audio ...........\n");
+                            if (ret1 == 0){
+                                    stop_encoding = 1;
+                                    break;
+                            }
+                            pkt.pts = 0;
+                            pkt.stream_index = ptr_output_ctx->audio_stream->index;
+
+                            av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt);
+
+                            av_free(&pkt);
+                    }
+
+                    break;
+
+            }
+            /*video stream*/
+            case AVMEDIA_TYPE_VIDEO:
+            {
+            	if(ptr_output_ctx->vcodec_copy_mark == 0){ //libx264 reencode
+					int got_output = 0;
+					int nEncodedBytes = avcodec_encode_video2(
+							ptr_output_ctx->video_stream->codec, &pkt, NULL,
+							&got_output);
+
+					if (nEncodedBytes < 0) {
+						av_log(NULL, AV_LOG_FATAL, "Video encoding failed\n");
+						exit(VIDEO_FLUSH_ERROR);
 					}
 
-					printf("audio ...........\n");
-					if (ret1 == 0){
+					printf("video ...........\n");
+					if (got_output) {
+						pkt.stream_index = ptr_output_ctx->video_stream->index;
+
+						if (ptr_output_ctx->video_stream->codec->coded_frame->pts
+								!= AV_NOPTS_VALUE)
+							pkt.pts = ptr_output_ctx->frame_count++;
+						pkt.pts = av_rescale_q(pkt.pts,
+								ptr_output_ctx->video_stream->codec->time_base,
+								ptr_output_ctx->video_stream->time_base);
+
+						if (ptr_output_ctx->video_stream->codec->coded_frame->key_frame)
+							pkt.flags |= AV_PKT_FLAG_KEY;
+
+						//judge key frame
+						if (ptr_output_ctx->pkt.flags && AV_PKT_FLAG_KEY) {
+							//init segment_time
+							record_segment_time(ptr_output_ctx);
+
+						}
+
+						av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt); //segmentation fault???????
+
+						av_free_packet(&pkt);
+					} else if (nEncodedBytes == 0) {
 						stop_encoding = 1;
 						break;
 					}
-					pkt.pts = 0;
-					pkt.stream_index = ptr_output_ctx->audio_stream->index;
-
-					av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt);
-
-					av_free(&pkt);
-				}
-
-				break;
-
-			}
-			/*video stream*/
-			case AVMEDIA_TYPE_VIDEO:
-			{
-				 int got_output = 0;
-				 int nEncodedBytes = avcodec_encode_video2(
-								ptr_output_ctx->video_stream->codec,
-								&pkt,
-								NULL ,
-								&got_output);
-
-				if (nEncodedBytes < 0) {
-					av_log(NULL, AV_LOG_FATAL, "Video encoding failed\n");
-					exit(VIDEO_FLUSH_ERROR);
-				}
-
-				printf("video ...........\n");
-				if(got_output){
-					pkt.stream_index = ptr_output_ctx->video_stream->index;
-
-					if (ptr_output_ctx->video_stream->codec->coded_frame->pts
-							!= AV_NOPTS_VALUE)
-						pkt.pts = ptr_output_ctx->frame_count ++;
-						pkt.pts =
-								av_rescale_q(
-										pkt.pts,
-										ptr_output_ctx->video_stream->codec->time_base,
-										ptr_output_ctx->video_stream->time_base);
-
-					if (ptr_output_ctx->video_stream->codec->coded_frame->key_frame)
-						pkt.flags |= AV_PKT_FLAG_KEY;
-
-					//judge key frame
-					if(ptr_output_ctx->pkt.flags && AV_PKT_FLAG_KEY){
-						//init segment_time
-						record_segment_time(ptr_output_ctx);
-
-					}
-
-					av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt);
-
-					av_free_packet(&pkt);
-				}else if(nEncodedBytes == 0){
-					stop_encoding = 1;
-					break;
-				}
-				break;
-			}
-
+            	}
+                break;
+            }
 			default:
 				stop_encoding = 1;
+				break;
 			}//end switch
 
 			if(stop_encoding) break;
+
+			if(ptr_output_ctx->vcodec_copy_mark == 1){ //video codec copy
+				printf("complete the %d.ts ,and write the m3u8 file..\n" ,ptr_output_ctx->segment_no);
+				write_m3u8_body( ptr_output_ctx ,ptr_output_ctx->curr_segment_time - ptr_output_ctx->prev_segment_time ,1);
+				break;
+			}
 
 		}//end for
 

@@ -23,7 +23,7 @@ int main(int argc ,char * argv[]){
 	seg_transcode_main(seg_union);
 
 
-	while(1);
+	printf("before free_seg_union function \n");
 	/*free memory*/
 	free_seg_union(seg_union);
 	return 0;

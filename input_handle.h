@@ -27,6 +27,9 @@ typedef struct {
 
 	/*	decode mark	*/
 	int 		mark_have_frame;
+
+	//---
+	AVBitStreamFilterContext *bitstream_filters;
 }Input_Context;
 
 

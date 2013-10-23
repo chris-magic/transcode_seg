@@ -75,6 +75,7 @@ typedef struct {
 
 	//
 	unsigned int frame_count;			//frame count use for generate video frame pts
+	int vcodec_copy_mark ;				//video stream codec copy or set libx264
 }Output_Context;
 
 /*
@@ -83,7 +84,7 @@ typedef struct {
  * @param:	output_file			the output file name
  *
  * */
-int init_output(Output_Context *ptr_output_ctx, char* output_file );
+int init_output(Output_Context *ptr_output_ctx, char* output_file ,Input_Context *input_ctx);
 
 /*
  * function : open_stream_codec

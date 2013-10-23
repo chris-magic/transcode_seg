@@ -43,7 +43,7 @@ void record_segment_time(Output_Context *ptr_output_ctx);
  * */
 void write_m3u8_header(Output_Context *ptr_output_ctx);
 
-void write_m3u8_body(Output_Context *ptr_output_ctx ,double segment_duration);
+void write_m3u8_body(Output_Context *ptr_output_ctx ,double segment_duration ,int end_mark);
 
 void write_m3u8_tailer(Output_Context *ptr_output_ctx);
 

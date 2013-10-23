@@ -17,7 +17,7 @@ int init_input(Input_Context *ptr_input_ctx, char* input_file) {
 	//open input file
 	ptr_input_ctx->ptr_format_ctx = NULL;
 	if( avformat_open_input(&ptr_input_ctx->ptr_format_ctx, input_file, NULL, NULL) != 0){
-		printf("inputfile init ,avformat_open_input failed .\n");
+		printf("inputfile init ,avformat_open_input failed ,input_file = %s.\n" ,input_file);
 		exit(AV_OPEN_INPUT_FAIL);
 	}
 
@@ -97,7 +97,11 @@ int init_input(Input_Context *ptr_input_ctx, char* input_file) {
 	}
 
 	printf("in here ,have open video codec ,and audio codec .\n");
-
+	ptr_input_ctx->bitstream_filters = av_bitstream_filter_init("h264_mp4toannexb");
+	if (!ptr_input_ctx->bitstream_filters) {
+		printf("bitstream_filters acquire failed .\n");
+		exit(1);
+	}
 	return 0;
 
 }
