@@ -389,8 +389,15 @@ static void open_audio (Output_Context *ptr_output_ctx ,AVStream * st){
     } else {
         audio_input_frame_size = audio_codec_ctx->frame_size;
     }
-    //ptr_output_ctx->samples = av_malloc(audio_input_frame_size * 2 * audio_codec_ctx->channels);
 
+    //audio_buf use to store pcm data ,use to encode audio
+    ptr_output_ctx->allocated_audio_buf_size = ptr_output_ctx->audio_stream->codec->frame_size
+			* av_get_bytes_per_sample(ptr_output_ctx->audio_stream->codec->sample_fmt) * ptr_output_ctx->audio_stream->codec->channels;
+    ptr_output_ctx->audio_buf = (uint8_t *)malloc(ptr_output_ctx->allocated_audio_buf_size);
+    if(ptr_output_ctx->audio_buf == NULL){
+    	printf("audio_buf malloc failed .\n");
+    	exit(MEMORY_MALLOC_FAIL);
+    }
 }
 
 
@@ -513,6 +520,7 @@ void encode_audio_frame(Output_Context *ptr_output_ctx , uint8_t *buf ,int buf_s
 
 	frame->pts = audio_count ;
 	audio_count += frame->nb_samples;
+	ptr_output_ctx->audio_count = audio_count;
 
 
 	if ((ret = avcodec_fill_audio_frame(frame, c->channels, AV_SAMPLE_FMT_S16,
@@ -559,72 +567,76 @@ void encode_flush(Output_Context *ptr_output_ctx , int nb_ostreams){
 
 	int i ;
 
-	for (i = 0; i < nb_ostreams; i++){
+	for (i = 0; i < nb_ostreams; i++) {
 
 		AVStream *st = ptr_output_ctx->ptr_format_ctx->streams[i];
 		AVCodecContext *enc = st->codec;
 		int stop_encoding = 0;
+		for (;;) {
+			AVPacket pkt;
+			int fifo_bytes;
+			av_init_packet(&pkt);
+			pkt.data = NULL;
+			pkt.size = 0;
+			switch (st->codec->codec_type) {
+			/*audio stream*/
+			case AVMEDIA_TYPE_AUDIO: {
 
-		for (;;){
-            AVPacket pkt;
-            int fifo_bytes;
-            av_init_packet(&pkt);
-            pkt.data = NULL;
-            pkt.size = 0;
+				fifo_bytes = av_fifo_size(ptr_output_ctx->fifo);
+				printf("fifo_bytes = %d \n", fifo_bytes);
+				if (fifo_bytes > 0) {
+					/* encode any samples remaining in fifo */
+					int frame_bytes = fifo_bytes;
+					av_fifo_generic_read(ptr_output_ctx->fifo,
+							ptr_output_ctx->audio_buf, fifo_bytes, NULL);
 
-            switch (st->codec->codec_type) {
-            /*audio stream*/
-            case AVMEDIA_TYPE_AUDIO:
-            {
+					/* pad last frame with silence if needed */
+					frame_bytes = enc->frame_size * enc->channels
+							* av_get_bytes_per_sample(enc->sample_fmt);
+					if (ptr_output_ctx->allocated_audio_buf_size < frame_bytes){
+						printf("ptr_output_ctx->allocated_audio_buf_size < frame_bytes \n");
+						break;
+					}
+					generate_silence(ptr_output_ctx->audio_buf + fifo_bytes,
+							enc->sample_fmt, frame_bytes - fifo_bytes);
 
+					encode_audio_frame(ptr_output_ctx,
+							ptr_output_ctx->audio_buf, frame_bytes);
 
-                    fifo_bytes = av_fifo_size(ptr_output_ctx->fifo);
-                    if (fifo_bytes > 0) {
-                            /* encode any samples remaining in fifo */
-                            int frame_bytes = fifo_bytes;
-                            av_fifo_generic_read(ptr_output_ctx->fifo, ptr_output_ctx->audio_buf, fifo_bytes, NULL);
+				} else {
+					/* flush encoder with NULL frames until it is done
+					 returning packets */
+					int got_packet = 0;
+					int ret1;
+					ret1 = avcodec_encode_audio2(enc, &pkt, NULL, &got_packet);
+					if (ret1 < 0) {
+						av_log(NULL, AV_LOG_FATAL, "..Audio encoding failed\n");
+						exit(AUDIO_ENCODE_ERROR);
+					}
 
-                            /* pad last frame with silence if needed */
-                            frame_bytes = enc->frame_size * enc->channels *
-                                                      av_get_bytes_per_sample(enc->sample_fmt);
-                            if (ptr_output_ctx->allocated_audio_buf_size < frame_bytes)
-                                    exit(1);
-                            generate_silence(ptr_output_ctx->audio_buf+fifo_bytes, enc->sample_fmt, frame_bytes - fifo_bytes);
+					if (got_packet == 0) {
+						printf("ret1 = 0\n");
+						stop_encoding = 1;
+						break;
+					}
+					ptr_output_ctx->audio_count += enc->frame_size;
+					pkt.pts = av_rescale_q(pkt.pts,
+							ptr_output_ctx->audio_stream->codec->time_base,
+							ptr_output_ctx->audio_stream->time_base);
+					pkt.dts = pkt.pts;
+					pkt.stream_index = ptr_output_ctx->audio_stream->index;
 
-                            printf("audio ...........\n");
-                            encode_audio_frame(ptr_output_ctx, ptr_output_ctx->audio_buf, frame_bytes);
+					av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt);
 
-                    } else {
-                            /* flush encoder with NULL frames until it is done
-                               returning packets */
-                            int got_packet = 0;
-                            int ret1;
-                            ret1 = avcodec_encode_audio2(enc, &pkt, NULL, &got_packet);
-                            if ( ret1 < 0) {
-                                    av_log(NULL, AV_LOG_FATAL, "..Audio encoding failed\n");
-                                    exit(AUDIO_ENCODE_ERROR);
-                            }
+					av_free_packet(&pkt);
+				}
 
-                            printf("audio ...........\n");
-                            if (ret1 == 0){
-                                    stop_encoding = 1;
-                                    break;
-                            }
-                            pkt.pts = 0;
-                            pkt.stream_index = ptr_output_ctx->audio_stream->index;
+				break;
 
-                            av_write_frame(ptr_output_ctx->ptr_format_ctx, &pkt);
-
-                            av_free(&pkt);
-                    }
-
-                    break;
-
-            }
-            /*video stream*/
-            case AVMEDIA_TYPE_VIDEO:
-            {
-            	if(ptr_output_ctx->vcodec_copy_mark == 0){ //libx264 reencode
+			}
+				/*video stream*/
+			case AVMEDIA_TYPE_VIDEO: {
+				if (ptr_output_ctx->vcodec_copy_mark == 0) { //libx264 reencode
 					int got_output = 0;
 					int nEncodedBytes = avcodec_encode_video2(
 							ptr_output_ctx->video_stream->codec, &pkt, NULL,
@@ -663,27 +675,24 @@ void encode_flush(Output_Context *ptr_output_ctx , int nb_ostreams){
 						stop_encoding = 1;
 						break;
 					}
-            	}
-                break;
-            }
+				} else {
+					printf("video codec copy ..\n");
+					stop_encoding = 1;
+				}
+				break;
+			}
 			default:
 				stop_encoding = 1;
 				break;
-			}//end switch
+			} //end switch...case
 
-			if(stop_encoding) break;
-
-			if(ptr_output_ctx->vcodec_copy_mark == 1){ //video codec copy
-				printf("complete the %d.ts ,and write the m3u8 file..\n" ,ptr_output_ctx->segment_no);
-				write_m3u8_body( ptr_output_ctx ,ptr_output_ctx->curr_segment_time - ptr_output_ctx->prev_segment_time ,1);
+			if (stop_encoding) {
 				break;
-			}
+			} //break the for(;;) loop
 
-		}//end for
+		} //end for(;;)
 
-
-	}
-
+	} //end for
 
 }
 
@@ -747,9 +756,8 @@ void do_audio_out(Output_Context *ptr_output_ctx ,Input_Context *ptr_input_ctx ,
 	av_fifo_generic_write(ptr_output_ctx->fifo, dst_data[0], dst_bufsize, NULL);
 
 	int frame_bytes = ptr_output_ctx->audio_stream->codec->frame_size
-			* av_get_bytes_per_sample(AV_SAMPLE_FMT_S16) * dst_nb_channels;
+			* av_get_bytes_per_sample(ptr_output_ctx->audio_stream->codec->sample_fmt) * dst_nb_channels;
 
-	ptr_output_ctx->audio_buf = malloc(frame_bytes);
 	while (av_fifo_size(ptr_output_ctx->fifo) >= frame_bytes) {
 		av_fifo_generic_read(ptr_output_ctx->fifo, ptr_output_ctx->audio_buf,
 				frame_bytes, NULL);
@@ -757,36 +765,25 @@ void do_audio_out(Output_Context *ptr_output_ctx ,Input_Context *ptr_input_ctx ,
 				frame_bytes);
 	}
 
-	free(ptr_output_ctx->audio_buf);
-	//swr_free(&ptr_output_ctx->swr);
 }
 
 void free_output_memory(Output_Context *ptr_output_ctx){
 
-
+	printf("in free output memory \n");
 	//malloc in open_video
 	av_free(ptr_output_ctx->video_outbuf);
-
 	//malloc in open_audio
 	av_free(ptr_output_ctx->audio_outbuf);
-
 	//audio buffer
 	av_fifo_free(ptr_output_ctx->fifo);
-
 	av_free(ptr_output_ctx->pict_buf);
-
 	av_free(ptr_output_ctx->encoded_yuv_pict);
-
+	swr_free(&ptr_output_ctx->swr);
 	//close codecs
-	avcodec_close(ptr_output_ctx->video_stream->codec);
-	avcodec_close(ptr_output_ctx->audio_stream->codec);
-
-
-
+//	avcodec_close(ptr_output_ctx->video_stream->codec);
+//	avcodec_close(ptr_output_ctx->audio_stream->codec);
 
 	//free
 	avformat_free_context(ptr_output_ctx->ptr_format_ctx);
-
-
 
 }

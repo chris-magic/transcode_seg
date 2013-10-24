@@ -108,8 +108,10 @@ int init_input(Input_Context *ptr_input_ctx, char* input_file) {
 
 void free_input(Input_Context *ptr_input_ctx){
 
-	avcodec_close(ptr_input_ctx->video_codec_ctx);  //???segmentation fault
-	avcodec_close(ptr_input_ctx->audio_codec_ctx);
+	printf("1\n");
+//	avcodec_close(ptr_input_ctx->video_codec_ctx);  //???segmentation fault
+//	printf("2\n");
+//	avcodec_close(ptr_input_ctx->audio_codec_ctx);
 	avformat_close_input(&ptr_input_ctx->ptr_format_ctx);
 
 }

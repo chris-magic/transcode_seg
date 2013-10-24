@@ -7,6 +7,7 @@
 #include <stdio.h>
 
 #include "libswscale/swscale.h"
+#include "libavutil/buffer.h"
 #include "segment_yy.h"
 #include "segment_utils.h"
 #include "chris_error.h"
@@ -158,8 +159,6 @@ int seg_transcode_main(Segment_U * seg_union){
 											/ AV_TIME_BASE
 									+ ptr_output_ctx->base_ipts; //current packet time in second
 
-					//printf("ptr_output_ctx->sync_ipts = %f \n" ,ptr_output_ctx->sync_ipts);
-
 					//first swscale
 					sws_scale(ptr_output_ctx->img_convert_ctx,
 							(const uint8_t* const *) ptr_input_ctx->yuv_frame->data,
@@ -177,20 +176,23 @@ int seg_transcode_main(Segment_U * seg_union){
 			/***********	video codec copy	****************/
 			}else if(seg_union->output_ctx->vcodec_copy_mark == 1){ /*video codec copy*/
 				AVBitStreamFilterContext *bsfc = ptr_input_ctx->bitstream_filters;
+				//AVPacket new_pkt;
+
 			    while (bsfc) {
-			        AVPacket new_pkt = ptr_input_ctx->pkt;
+
+			    	ptr_output_ctx->pkt = ptr_input_ctx->pkt;
 			        int a = av_bitstream_filter_filter(bsfc, ptr_output_ctx->video_stream->codec, NULL,
-			                                           &new_pkt.data, &new_pkt.size,
+			                                           &ptr_output_ctx->pkt.data, &ptr_output_ctx->pkt.size,
 			                                           ptr_input_ctx->pkt.data, ptr_input_ctx->pkt.size,
 			                                           ptr_input_ctx->pkt.flags & AV_PKT_FLAG_KEY);
-			        if(a == 0 && new_pkt.data != ptr_input_ctx->pkt.data && new_pkt.destruct) {
+			        if(a == 0 && ptr_output_ctx->pkt.data != ptr_input_ctx->pkt.data && ptr_output_ctx->pkt.destruct) {
 			        	//printf("a = 0\n");
-			        	uint8_t *t = av_malloc(new_pkt.size + FF_INPUT_BUFFER_PADDING_SIZE); //the new should be a subset of the old so cannot overflow
+			        	uint8_t *t = av_malloc(ptr_output_ctx->pkt.size + FF_INPUT_BUFFER_PADDING_SIZE); //the new should be a subset of the old so cannot overflow
 			            if(t) {
-			                memcpy(t, new_pkt.data, new_pkt.size);
-			                memset(t + new_pkt.size, 0, FF_INPUT_BUFFER_PADDING_SIZE);
-			                new_pkt.data = t;
-			                new_pkt.buf = NULL;
+			                memcpy(t, ptr_output_ctx->pkt.data, ptr_output_ctx->pkt.size);
+			                memset(t + ptr_output_ctx->pkt.size, 0, FF_INPUT_BUFFER_PADDING_SIZE);
+			                ptr_output_ctx->pkt.data = t;
+			                ptr_output_ctx->pkt.buf = NULL;
 			                a = 1;
 			            } else //error
 			                a = AVERROR(ENOMEM);
@@ -198,9 +200,9 @@ int seg_transcode_main(Segment_U * seg_union){
 			        if (a > 0) {
 			        	//printf("a > 0\n");
 			            av_free_packet(&ptr_input_ctx->pkt);
-			            new_pkt.buf = av_buffer_create(new_pkt.data, new_pkt.size,
+			            ptr_output_ctx->pkt.buf = av_buffer_create(ptr_output_ctx->pkt.data, ptr_output_ctx->pkt.size,
 			                                           av_buffer_default_free, NULL, 0);
-			            if (!new_pkt.buf)
+			            if (!ptr_output_ctx->pkt.buf)
 			                exit(1);
 			        } else if (a < 0) {
 			            av_log(NULL, AV_LOG_ERROR, "Failed to open bitstream filter %s for stream %d ",
@@ -208,9 +210,11 @@ int seg_transcode_main(Segment_U * seg_union){
 			            exit(1);
 			        }
 			        //ptr_input_ctx->pkt = new_pkt;
-			        ptr_output_ctx->pkt = new_pkt;
+			       //  ptr_output_ctx->pkt = new_pkt;
 			        bsfc = bsfc->next;  //break while
+
 			    }
+
 
 #if 1		/*if this branch ,i feel this stream timestamp may be have some bug?????*/
 			    //alter pts for packet
@@ -236,7 +240,10 @@ int seg_transcode_main(Segment_U * seg_union){
 					record_segment_time(ptr_output_ctx);
 				}
 			    av_write_frame(ptr_output_ctx->ptr_format_ctx, &ptr_output_ctx->pkt);
+
+			    av_free_packet(&ptr_output_ctx->pkt);  //memory leak
 			}
+
 
 		/*	audio stream 	*/
 		} else if (ptr_input_ctx->pkt.stream_index == ptr_input_ctx->audio_index) {
@@ -274,45 +281,39 @@ int seg_transcode_main(Segment_U * seg_union){
 
 		}
 
-		if(&ptr_input_ctx->pkt)
-			av_free_packet(&ptr_input_ctx->pkt);
+		if(&ptr_input_ctx->pkt){  av_free_packet(&ptr_input_ctx->pkt); }
 
 	}//endwhile
-	avio_flush(ptr_output_ctx->ptr_format_ctx->pb);
-	avio_close(ptr_output_ctx->ptr_format_ctx->pb);
 	double file_duration = ptr_input_ctx->ptr_format_ctx->duration / AV_TIME_BASE
 				+ (double)( ptr_input_ctx->ptr_format_ctx->duration % AV_TIME_BASE ) / AV_TIME_BASE;
 
 
 	ptr_output_ctx->base_ipts  += file_duration;  //completed files sum time duration
-	printf("end while ......,time_base = %f .............> \n" ,ptr_output_ctx->base_ipts  );
+	//printf("end while ......,time_base = %f .............> \n" ,ptr_output_ctx->base_ipts  );
 	ptr_output_ctx->audio_resample = 0;
 
-	free_input(ptr_input_ctx);
-	sws_freeContext(ptr_output_ctx->img_convert_ctx);
  //end
-
-	printf("before flush ,ptr_output_ctx->ptr_format_ctx->nb_streams = %d \n\n" ,ptr_output_ctx->ptr_format_ctx->nb_streams);
+	printf("before flush ,ptr_output_ctx->ptr_format_ctx->nb_streams = %d \n" ,ptr_output_ctx->ptr_format_ctx->nb_streams);
 	encode_flush(ptr_output_ctx ,ptr_output_ctx->ptr_format_ctx->nb_streams);
+	av_write_trailer(ptr_output_ctx->ptr_format_ctx );
+	avio_flush(ptr_output_ctx->ptr_format_ctx->pb);
+	avio_close(ptr_output_ctx->ptr_format_ctx->pb);
 
 	write_m3u8_tailer(ptr_output_ctx);
-	printf("before wirite tailer ...\n\n");
-	av_write_trailer(ptr_output_ctx->ptr_format_ctx );
-
 	return 0;
 }
 
 
 int free_seg_union(Segment_U * seg_union){
 	printf("start free segment union ...\n");
-
+	free_input(seg_union->input_ctx);
 	//free input context relevance
 	free_input_memory(seg_union->input_ctx);
 
 	if(seg_union->input_ctx)
 		free(seg_union->input_ctx);
-
 	//free output context relevance
+	sws_freeContext(seg_union->output_ctx->img_convert_ctx);
 	free_output_memory(seg_union->output_ctx);
 	if(seg_union->output_ctx)
 		free(seg_union->output_ctx);

@@ -75,6 +75,7 @@ typedef struct {
 
 	//
 	unsigned int frame_count;			//frame count use for generate video frame pts
+	unsigned int audio_count;			//audio count use for generate audio frame pts
 	int vcodec_copy_mark ;				//video stream codec copy or set libx264
 }Output_Context;
 

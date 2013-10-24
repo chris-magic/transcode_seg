@@ -22,8 +22,6 @@ int main(int argc ,char * argv[]){
 	/*segmentation medium	*/
 	seg_transcode_main(seg_union);
 
-
-	printf("before free_seg_union function \n");
 	/*free memory*/
 	free_seg_union(seg_union);
 	return 0;

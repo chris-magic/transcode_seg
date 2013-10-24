@@ -152,23 +152,34 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 
 
 	/*	check the input argument valid or not*/
-	if( seg_union->mode_type == -1	||
-			seg_union->input_nb == 0 ||
-			seg_union->m3u8_name == NULL ||
-			seg_union->segment_duration == 0 ||
-			seg_union->storage_dir == NULL ||
-			seg_union->ts_prfix_name == NULL ||
-			seg_union->frame_rate == 0 	||
-			seg_union->width == 0 ||
-			seg_union->height == 0	||
-			seg_union->video_rate == 0 ||
-			seg_union->audio_rate == 0 ||
-			seg_union->sample  == 0 ||
-			seg_union->channel == 0){
+	if( strcmp(seg_union->vcodec ,"libx264") == 0){//video codec libx264
+		if (seg_union->mode_type == -1 || seg_union->input_nb == 0
+				|| seg_union->m3u8_name == NULL
+				|| seg_union->segment_duration == 0
+				|| seg_union->storage_dir == NULL
+				|| seg_union->ts_prfix_name == NULL
+				|| seg_union->frame_rate == 0 || seg_union->width == 0
+				|| seg_union->height == 0 || seg_union->video_rate == 0
+				|| seg_union->audio_rate == 0 || seg_union->sample == 0
+				|| seg_union->channel == 0) {
 
-		printf("  Segment Invalid argument   ,please use"
-													" '%s  --help '  to find some information\n", argv[0]);
-		exit(SEG_INVALID_ARGUMENT);
+			printf("  Segment Invalid argument   ,please use"
+					" '%s  --help '  to find some information\n", argv[0]);
+			exit(SEG_INVALID_ARGUMENT);
+		}
+	}else if(strcmp(seg_union->vcodec ,"copy") == 0){
+		if (seg_union->mode_type == -1 || seg_union->input_nb == 0
+				|| seg_union->m3u8_name == NULL
+				|| seg_union->segment_duration == 0
+				|| seg_union->storage_dir == NULL
+				|| seg_union->ts_prfix_name == NULL
+				|| seg_union->audio_rate == 0 || seg_union->sample == 0
+				|| seg_union->channel == 0) {
+
+			printf("  Segment Invalid argument   ,please use"
+					" '%s  --help '  to find some information\n", argv[0]);
+			exit(SEG_INVALID_ARGUMENT);
+		}
 	}
 
 }
@@ -232,7 +243,7 @@ void record_segment_time(Output_Context *ptr_output_ctx){
 
 	if(ptr_output_ctx->start_time_mark == 0){
 		ptr_output_ctx->start_time_mark = 1;
-		printf("混蛋。。。、\n");
+		//printf("混蛋。。。、\n");
 		ptr_output_ctx->prev_segment_time = av_q2d(ptr_output_ctx->video_stream->time_base) *
 													(ptr_output_ctx->pkt.pts )
 													- (double)ptr_output_ctx->ptr_format_ctx->start_time / AV_TIME_BASE;
@@ -245,11 +256,14 @@ void record_segment_time(Output_Context *ptr_output_ctx){
 						av_q2d(ptr_output_ctx->video_stream->time_base) *
 										(ptr_output_ctx->pkt.pts )
 										- (double)ptr_output_ctx->ptr_format_ctx->start_time / AV_TIME_BASE;
-	//printf("ptr_output_ctx->prev_segment_time = %f \n" ,ptr_output_ctx->curr_segment_time);
+	if(ptr_output_ctx->vcodec_copy_mark == 1){ //video codecContext copy
+		ptr_output_ctx->sync_ipts = ptr_output_ctx->curr_segment_time;
+	}
 
 //	//time meet
 	if(ptr_output_ctx->curr_segment_time - ptr_output_ctx->prev_segment_time >= ptr_output_ctx->segment_duration){
-		printf("...meet time ...\n" );
+		//printf("...meet time ...\n" );
+		av_write_trailer(ptr_output_ctx->ptr_format_ctx);   // close ts file and free memory
 		avio_flush(ptr_output_ctx->ptr_format_ctx->pb);
 		avio_close(ptr_output_ctx->ptr_format_ctx->pb);
 
@@ -261,6 +275,12 @@ void record_segment_time(Output_Context *ptr_output_ctx){
 			fprintf(stderr, "Could not open '%s'\n", ptr_output_ctx->ts_name);
 			exit(OPEN_MUX_FILE_FAIL);
 		}
+
+        // Write a new header at the start of each file
+        if (avformat_write_header(ptr_output_ctx->ptr_format_ctx, NULL)) {
+          fprintf(stderr, "Could not write mpegts header to first output file\n");
+          exit(1);
+        }
 
 		ptr_output_ctx->prev_segment_time = ptr_output_ctx->curr_segment_time;   //place here
 	}
@@ -279,7 +299,7 @@ void write_m3u8_header(Output_Context *ptr_output_ctx){
 		}
 
 		//write header
-		fprintf(ptr_output_ctx->fp_m3u8 ,"#EXTM3U\n#EXT-X-TARGETDURATION:%.02f\n#EXT-X-MEDIA-SEQUENCE:1\n" ,ptr_output_ctx->segment_duration);
+		fprintf(ptr_output_ctx->fp_m3u8 ,"#EXTM3U\n#EXT-X-TARGETDURATION:%d\n#EXT-X-VERSION:3\n#EXT-X-MEDIA-SEQUENCE:1\n" ,(int)ptr_output_ctx->segment_duration);
 
 		fclose(ptr_output_ctx->fp_m3u8);
 	}
