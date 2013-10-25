@@ -100,7 +100,7 @@ int init_input(Input_Context *ptr_input_ctx, char* input_file) {
 	ptr_input_ctx->bitstream_filters = av_bitstream_filter_init("h264_mp4toannexb");
 	if (!ptr_input_ctx->bitstream_filters) {
 		printf("bitstream_filters acquire failed .\n");
-		exit(1);
+		exit(BITSTREAM_FILTER_INIT_FAIL);
 	}
 	return 0;
 

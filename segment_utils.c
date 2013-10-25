@@ -60,7 +60,7 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 		case 'v': 	//version
 			printf("**********************************\n");
 			printf("  segment version:%s \n\n", SEG_VERSION);
-			exit(0);
+			exit(0);  //exit normal
 		case 'h': //help
 			fprintf(stderr,
 					"\n**********************************\n"
@@ -80,7 +80,7 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 					"--channel			audio channel number\n"
 					"--vcodec			value 'copy' or 'libx264'\n"
 					"\n");
-			exit(0);
+			exit(0);  //exit normal
 //			break;
 		case 'i': //input file
 			if(seg_union->input_nb > MAX_INPUT_NUM){
@@ -142,7 +142,7 @@ void parse_option_argument(Segment_U * seg_union ,int argc, char *argv[]) {
 			seg_union->channel = atoi(optarg);
 			break;
 		case '?':		//invalid options
-			exit(0);
+			exit(0);	//exit normal
 //			break;
 		default:		//there is no options
 			break;
@@ -279,7 +279,7 @@ void record_segment_time(Output_Context *ptr_output_ctx){
         // Write a new header at the start of each file
         if (avformat_write_header(ptr_output_ctx->ptr_format_ctx, NULL)) {
           fprintf(stderr, "Could not write mpegts header to first output file\n");
-          exit(1);
+          exit(AVFORMAT_WRITE_HEADER_FAIL);
         }
 
 		ptr_output_ctx->prev_segment_time = ptr_output_ctx->curr_segment_time;   //place here

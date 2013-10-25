@@ -43,6 +43,18 @@
 #define		CREAT_M3U8_DIR_FAIL				0x43
 #define		OPEN_M3U8_FAIL					0x44
 
+#define		BITSTREAM_FILTER_INIT_FAIL		0x45
+#define		BITSTREAM_FILTER_FILTER_FAIL	0x46
+
+#define		AVFORMAT_WRITE_HEADER_FAIL		0x48
+
+#define   	NEW_STREAM_FAIL					0x50
+
+#define 	SWR_ALLOC_FAIL					0x55
+
+#define		FIFO_REALLOC2_FAIL				0x5A
+
+
 
 
 

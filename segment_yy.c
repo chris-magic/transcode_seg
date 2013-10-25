@@ -203,11 +203,11 @@ int seg_transcode_main(Segment_U * seg_union){
 			            ptr_output_ctx->pkt.buf = av_buffer_create(ptr_output_ctx->pkt.data, ptr_output_ctx->pkt.size,
 			                                           av_buffer_default_free, NULL, 0);
 			            if (!ptr_output_ctx->pkt.buf)
-			                exit(1);
+			                exit(MEMORY_MALLOC_FAIL);
 			        } else if (a < 0) {
 			            av_log(NULL, AV_LOG_ERROR, "Failed to open bitstream filter %s for stream %d ",
 			                   bsfc->filter->name, ptr_input_ctx->pkt.stream_index);
-			            exit(1);
+			            exit(BITSTREAM_FILTER_FILTER_FAIL);
 			        }
 			        //ptr_input_ctx->pkt = new_pkt;
 			       //  ptr_output_ctx->pkt = new_pkt;

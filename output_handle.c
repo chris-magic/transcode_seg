@@ -29,7 +29,7 @@ AVStream *add_output_stream(AVFormatContext *output_format_context, AVStream *in
     output_stream = avformat_new_stream(output_format_context, 0);
     if (!output_stream) {
         fprintf(stderr, "Could not allocate stream\n");
-        exit(1);
+        exit(NEW_STREAM_FAIL);
     }
 
     input_codec_context = input_stream->codec;
@@ -510,7 +510,7 @@ void encode_audio_frame(Output_Context *ptr_output_ctx , uint8_t *buf ,int buf_s
 	AVFrame *frame = avcodec_alloc_frame();
 	if (frame == NULL) {
 		printf("frame malloc failed ...\n");
-		exit(1);
+		exit(MEMORY_MALLOC_FAIL);
 	}
 
 	static unsigned int audio_count = 0;
@@ -709,7 +709,7 @@ void do_audio_out(Output_Context *ptr_output_ctx ,Input_Context *ptr_input_ctx ,
 		ptr_output_ctx->swr = swr_alloc();
 		if (!ptr_output_ctx->swr) {
 			printf("swr context failed ...\n");
-			exit(1);
+			exit(SWR_ALLOC_FAIL);
 		}
 
 		av_opt_set_int(ptr_output_ctx->swr, "in_channel_layout", decoded_frame->channel_layout, 0);
@@ -737,7 +737,7 @@ void do_audio_out(Output_Context *ptr_output_ctx ,Input_Context *ptr_input_ctx ,
 
 		if (ret < 0) {
 			fprintf(stderr, "Could not allocate destination samples\n");
-			exit(1);
+			exit(MEMORY_MALLOC_FAIL);
 		}
 
 	}
@@ -751,7 +751,7 @@ void do_audio_out(Output_Context *ptr_output_ctx ,Input_Context *ptr_input_ctx ,
 	if (av_fifo_realloc2(ptr_output_ctx->fifo,
 			av_fifo_size(ptr_output_ctx->fifo) + dst_bufsize) < 0) {
 		av_log(NULL, AV_LOG_FATAL, "av_fifo_realloc2() failed\n");
-		exit(1);
+		exit(FIFO_REALLOC2_FAIL);
 	}
 	av_fifo_generic_write(ptr_output_ctx->fifo, dst_data[0], dst_bufsize, NULL);
 
